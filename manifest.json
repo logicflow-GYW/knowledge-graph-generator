@@ -4,7 +4,7 @@
     "version": "1.5.0",
     "minAppVersion": "0.15.0",
     "description": "自动生成、审核和修正知识笔记，构建个人知识图谱。",
-    "author": "logicflow-GYW"
+    "author": "logicflow-GYW",
     "authorUrl": "",
     "isDesktopOnly": false
 }
