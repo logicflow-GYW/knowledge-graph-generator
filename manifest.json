@@ -1,7 +1,7 @@
 {
     "id": "knowledge-graph-generator",
     "name": "Knowledge Graph Generator",
-    "version": "1.5.4",
+    "version": "1.6.0",
     "minAppVersion": "0.15.0",
     "description": "自动生成、审核和修正知识笔记，构建个人知识图谱.",
     "author": "logicflow-GYW",
