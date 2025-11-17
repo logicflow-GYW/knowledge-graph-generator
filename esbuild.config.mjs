@@ -9,19 +9,21 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 esbuild.build({
-banner: {
-js: banner,
-},
-entryPoints: ["main.ts"],
-bundle: true,
-external: [
-"obsidian",
-"electron",
-],
-format: "cjs",
-target: "es2018",
-logLevel: "info",
-sourcemap: "inline",
-treeShaking: true,
-outfile: "main.js",
+    banner: {
+        js: banner,
+    },
+    // 入口点已更新为 "src/main.ts"
+    entryPoints: ["src/main.ts"],
+    bundle: true,
+    external: [
+        "obsidian",
+        "electron",
+    ],
+    format: "cjs",
+    target: "es2018",
+    logLevel: "info",
+    sourcemap: "inline",
+    treeShaking: true,
+    // 输出文件 "main.js" 仍在根目录
+    outfile: "main.js",
 }).catch(() => process.exit(1));
