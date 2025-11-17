@@ -18,7 +18,8 @@
       "ES7"
     ]
   },
+  // "include" 路径已更新为只包含 src 目录
   "include": [
-    "**/*.ts"
+    "src/**/*.ts"
   ]
 }
