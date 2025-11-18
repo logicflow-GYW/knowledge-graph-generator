@@ -22,7 +22,6 @@ export interface KnowledgeGraphPluginSettings {
     output_dir: string;
 
     // 系统配置
-    max_workers: number; // 并发数
     generation_batch_size: number;
     request_delay: number; // 每轮之间的延迟（秒）
 

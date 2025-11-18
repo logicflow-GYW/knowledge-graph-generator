@@ -31,7 +31,6 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     output_dir: "KnowledgeGraphNotes",
     
     // 系统
-    max_workers: 2,
     generation_batch_size: 5,
     request_delay: 5,
     
@@ -225,19 +224,6 @@ export class KGsSettingTab extends PluginSettingTab {
                 .onChange(async (value) => {
                     this.plugin.settings.output_dir = value.trim().replace(/\/$/, ""); // 移除末尾的 /
                     await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName("最大并发数 (Max Workers)")
-            .setDesc("（注意：当前 V2.2 引擎为单线程流水线，此设置暂未生效）")
-            .addText(text => text
-                .setValue(String(this.plugin.settings.max_workers))
-                .onChange(async (value) => {
-                    const num = parseInt(value, 10);
-                    if (!isNaN(num) && num > 0) {
-                        this.plugin.settings.max_workers = num;
-                        await this.plugin.saveSettings();
-                    }
                 }));
 
         new Setting(containerEl)
