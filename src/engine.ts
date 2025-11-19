@@ -252,9 +252,11 @@ export class Engine {
             this.plugin.data.reviewQueue.push(revisedTask); 
             // 修改：console.log -> console.debug
             console.debug(`🔄 [Revision Complete]: ${task.idea}`);
-        } catch (e: any) {
-             // 修改：e is unknown/any -> 使用 any 暂时规避，或 (e as Error).message
-            console.error(`❌ [Revision Failed]: ${task.idea} - ${e?.message}`);
+        } catch (e: unknown) {
+             // 使用类型更安全的写法，彻底消除 any
+            const errMsg = e instanceof Error ? e.message : String(e);
+            // ✅ 修正点：使用 errMsg 而不是 err?.message
+            console.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
             this.plugin.data.revisionQueue.unshift(task); 
         }
     }

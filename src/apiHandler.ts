@@ -105,9 +105,11 @@ export class APIHandler {
         return data.candidates[0].content.parts[0].text.trim();
     }
 
-    private _isQuotaError(error: any): boolean {
-        const httpStatus = error.status;
-        const errorMessage = error.message?.toLowerCase() || "";
+    // 修改：将参数类型改为 unknown，并在内部断言，避免 "Unexpected any"
+    private _isQuotaError(error: unknown): boolean {
+        const err = error as { status?: number; message?: string }; // 局部类型断言
+        const httpStatus = err.status;
+        const errorMessage = err.message?.toLowerCase() || "";
         
         if (httpStatus === 401 || httpStatus === 403 || httpStatus === 429) {
             return true;
@@ -146,18 +148,23 @@ export class APIHandler {
             const result = await this._makeOpenAIRequest(key, prompt, primaryModel);
             this._resetCooldown(key, "openai");
             return result;
-        } catch (primaryError: any) {
-            console.warn(`OpenAI primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryError.message);
+        } catch (e: unknown) {
+            const primaryError = e;
+            // 修改：使用类型守卫或断言来获取 message，避免 (e as any)
+            const primaryMsg = (e instanceof Error) ? e.message : String(e);
+            
+            console.warn(`OpenAI primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryMsg);
             
             if (backupModel) { 
                 try {
                     const backupResult = await this._makeOpenAIRequest(key, prompt, backupModel);
                     this._resetCooldown(key, "openai");
                     return backupResult; 
-                } catch (backupError: any) {
-                    console.error(`OpenAI backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupError.message);
+                } catch (e2: unknown) {
+                    const backupMsg = (e2 instanceof Error) ? e2.message : String(e2);
+                    console.error(`OpenAI backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupMsg);
                     
-                    if (this._isQuotaError(primaryError) || this._isQuotaError(backupError)) {
+                    if (this._isQuotaError(primaryError) || this._isQuotaError(e2)) {
                         this._cooldownKey(key, "openai");
                     }
                     throw new ApiKeyExhaustedError(`OpenAI key failed (both primary and backup models).`);
@@ -167,7 +174,7 @@ export class APIHandler {
             if (this._isQuotaError(primaryError)) {
                 this._cooldownKey(key, "openai");
             }
-            throw new ApiKeyExhaustedError(`OpenAI key failed (primary model failed, no backup): ${primaryError.message}`);
+            throw new ApiKeyExhaustedError(`OpenAI key failed (primary model failed, no backup): ${primaryMsg}`);
         }
     }
 
@@ -179,18 +186,21 @@ export class APIHandler {
             const result = await this._makeGoogleAPIRequest(key, prompt, primaryModel);
             this._resetCooldown(key, "google");
             return result;
-        } catch (primaryError: any) {
-            console.warn(`Google primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryError.message);
+        } catch (e: unknown) {
+            const primaryError = e;
+            const primaryMsg = (e instanceof Error) ? e.message : String(e);
+            console.warn(`Google primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryMsg);
             
             if (backupModel) {
                 try {
                     const backupResult = await this._makeGoogleAPIRequest(key, prompt, backupModel);
                     this._resetCooldown(key, "google");
                     return backupResult; 
-                } catch (backupError: any) {
-                    console.error(`Google backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupError.message);
+                } catch (e2: unknown) {
+                    const backupMsg = (e2 instanceof Error) ? e2.message : String(e2);
+                    console.error(`Google backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupMsg);
                     
-                    if (this._isQuotaError(primaryError) || this._isQuotaError(backupError)) {
+                    if (this._isQuotaError(primaryError) || this._isQuotaError(e2)) {
                         this._cooldownKey(key, "google");
                     }
                     throw new ApiKeyExhaustedError(`Google key failed (both primary and backup models).`);
@@ -200,7 +210,7 @@ export class APIHandler {
             if (this._isQuotaError(primaryError)) {
                 this._cooldownKey(key, "google");
             }
-            throw new ApiKeyExhaustedError(`Google key failed (primary model failed, no backup): ${primaryError.message}`);
+            throw new ApiKeyExhaustedError(`Google key failed (primary model failed, no backup): ${primaryMsg}`);
         }
     }
 
@@ -218,11 +228,9 @@ export class APIHandler {
                 const key = this._selectKey(this.openai_keys, "openai");
                 if (key) {
                     try {
-                        // 修改：console.log -> console.debug
                         console.debug(`Trying OpenAI key ...${key.slice(-4)}`);
                         return await this._callOpenAI(key, prompt);
                     } catch (e: unknown) {
-                        // 修改：catch(e: unknown) 并断言
                         const err = e as Error;
                         lastError = err;
                         new Notice(`OpenAI key ...${key.slice(-4)} failed. Trying next.`);
