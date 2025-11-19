@@ -1,0 +1,38 @@
+/* styles.css */
+
+/* QueueModal styles */
+.kg-modal-summary {
+    font-weight: bold;
+    font-size: var(--font-ui-large);
+    cursor: pointer;
+    padding: 5px 0;
+}
+
+.kg-queue-desc-empty {
+    padding-left: 10px;
+}
+
+.kg-list-container {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--background-modifier-border);
+    padding: 5px;
+    margin-left: 10px;
+}
+
+.kg-queue-desc-truncated {
+    padding-left: 10px;
+}
+
+/* Settings styles */
+.kg-textarea-tall {
+    height: 300px;
+}
+
+.kg-textarea-medium {
+    height: 200px;
+}
+
+.kg-textarea-short {
+    height: 150px;
+}
