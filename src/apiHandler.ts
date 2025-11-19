@@ -1,4 +1,4 @@
-// apiHandler.ts (已重构为 TypeScript)
+// src/apiHandler.ts
 
 import { requestUrl, Notice } from 'obsidian';
 import KnowledgeGraphPlugin from './main';
@@ -28,7 +28,6 @@ export class APIHandler {
     private keyUsageOpenAI = new Map<string, KeyUsageStatus>();
     private keyUsageGoogle = new Map<string, KeyUsageStatus>();
     
-    // 用于跟踪是否已经通知过故障切换
     private hasNotifiedFailover: boolean = false;
 
     constructor(plugin: KnowledgeGraphPlugin) {
@@ -66,9 +65,6 @@ export class APIHandler {
         return null;
     }
 
-    /**
-     * 实际执行 OpenAI API 请求
-     */
     private async _makeOpenAIRequest(key: string, prompt: string, modelName: string): Promise<string> {
         const response = await requestUrl({
             url: `${this.settings.openai_base_url}/chat/completions`,
@@ -87,9 +83,6 @@ export class APIHandler {
         return response.json.choices[0].message.content.trim();
     }
 
-    /**
-     * 实际执行 Google Gemini API 请求
-     */
     private async _makeGoogleAPIRequest(key: string, prompt: string, modelName: string): Promise<string> {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
         const response = await requestUrl({
@@ -112,9 +105,6 @@ export class APIHandler {
         return data.candidates[0].content.parts[0].text.trim();
     }
 
-    /**
-     * 检查是否是额度/权限类错误
-     */
     private _isQuotaError(error: any): boolean {
         const httpStatus = error.status;
         const errorMessage = error.message?.toLowerCase() || "";
@@ -130,9 +120,6 @@ export class APIHandler {
         return false;
     }
 
-    /**
-     * 冷却一个 Key
-     */
     private _cooldownKey(key: string, provider: 'openai' | 'google'): void {
         const keyUsageMap = provider === "openai" ? this.keyUsageOpenAI : this.keyUsageGoogle;
         const keyUsage = keyUsageMap.get(key);
@@ -142,9 +129,6 @@ export class APIHandler {
         }
     }
 
-    /**
-     * 重置一个 Key 的冷却 (调用成功时)
-     */
     private _resetCooldown(key: string, provider: 'openai' | 'google'): void {
         const keyUsageMap = provider === "openai" ? this.keyUsageOpenAI : this.keyUsageGoogle;
         const keyUsage = keyUsageMap.get(key);
@@ -158,25 +142,21 @@ export class APIHandler {
         const primaryModel = this.settings.openai_model;
         const backupModel = this.settings.openai_backup_model;
         
-        // 1. 尝试主模型
         try {
             const result = await this._makeOpenAIRequest(key, prompt, primaryModel);
             this._resetCooldown(key, "openai");
             return result;
-        } catch (primaryError) {
+        } catch (primaryError: any) {
             console.warn(`OpenAI primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryError.message);
             
-            // 只要主模型失败 (无论何种原因) 并且存在备用模型，就尝试备用模型。
             if (backupModel) { 
                 try {
-                    // 2. 尝试备用模型
                     const backupResult = await this._makeOpenAIRequest(key, prompt, backupModel);
                     this._resetCooldown(key, "openai");
-                    return backupResult; // 备用模型成功
-                } catch (backupError) {
+                    return backupResult; 
+                } catch (backupError: any) {
                     console.error(`OpenAI backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupError.message);
                     
-                    // 3. 主备都失败了，此时才检查是否需要冷却 (基于 *任何* 一个错误)
                     if (this._isQuotaError(primaryError) || this._isQuotaError(backupError)) {
                         this._cooldownKey(key, "openai");
                     }
@@ -184,7 +164,6 @@ export class APIHandler {
                 }
             }
             
-            // 4. 主模型失败，且 *没有* 备用模型
             if (this._isQuotaError(primaryError)) {
                 this._cooldownKey(key, "openai");
             }
@@ -196,24 +175,21 @@ export class APIHandler {
         const primaryModel = this.settings.google_model;
         const backupModel = this.settings.google_backup_model;
         
-        // 1. 尝试主模型
         try {
             const result = await this._makeGoogleAPIRequest(key, prompt, primaryModel);
             this._resetCooldown(key, "google");
             return result;
-        } catch (primaryError) {
+        } catch (primaryError: any) {
             console.warn(`Google primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryError.message);
             
             if (backupModel) {
                 try {
-                    // 2. 尝试备用模型
                     const backupResult = await this._makeGoogleAPIRequest(key, prompt, backupModel);
                     this._resetCooldown(key, "google");
-                    return backupResult; // 备用模型成功
-                } catch (backupError) {
+                    return backupResult; 
+                } catch (backupError: any) {
                     console.error(`Google backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupError.message);
                     
-                    // 3. 主备都失败了
                     if (this._isQuotaError(primaryError) || this._isQuotaError(backupError)) {
                         this._cooldownKey(key, "google");
                     }
@@ -221,7 +197,6 @@ export class APIHandler {
                 }
             }
             
-            // 4. 主模型失败，且 *没有* 备用模型
             if (this._isQuotaError(primaryError)) {
                 this._cooldownKey(key, "google");
             }
@@ -237,28 +212,29 @@ export class APIHandler {
         const openAIEnabled = this.openai_keys.length > 0 && !!(this.settings.openai_model || this.settings.openai_backup_model);
         const googleEnabled = this.google_keys.length > 0 && !!(this.settings.google_model || this.settings.google_backup_model);
 
-        // 1. 尝试 OpenAI
         if (openAIEnabled) {
             openAIKeysAttempted = true;
             for (let i = 0; i < this.openai_keys.length; i++) {
                 const key = this._selectKey(this.openai_keys, "openai");
                 if (key) {
                     try {
-                        console.log(`Trying OpenAI key ...${key.slice(-4)}`);
+                        // 修改：console.log -> console.debug
+                        console.debug(`Trying OpenAI key ...${key.slice(-4)}`);
                         return await this._callOpenAI(key, prompt);
-                    } catch (e: any) {
-                        lastError = e;
+                    } catch (e: unknown) {
+                        // 修改：catch(e: unknown) 并断言
+                        const err = e as Error;
+                        lastError = err;
                         new Notice(`OpenAI key ...${key.slice(-4)} failed. Trying next.`);
                     }
                 }
             }
         } else if (this.openai_keys.length > 0) {
             openAIKeysAttempted = true;
-            lastError = new Error("OpenAI: 提供了 Key 但未指定模型。");
+            lastError = new Error("OpenAI: Keys provided but no models defined.");
             console.warn(lastError.message);
         }
 
-        // 2. 尝试 Google
         if (googleEnabled) {
             if (openAIKeysAttempted && !this.hasNotifiedFailover) {
                 new Notice("All OpenAI keys failed or unavailable. Switching to Google Gemini...");
@@ -268,23 +244,23 @@ export class APIHandler {
                 const key = this._selectKey(this.google_keys, "google");
                 if (key) {
                     try {
-                        console.log(`Trying Google Gemini key ...${key.slice(-4)}`);
+                        console.debug(`Trying Google Gemini key ...${key.slice(-4)}`);
                         return await this._callGoogleAPI(key, prompt);
-                    } catch (e: any) {
-                        lastError = e;
+                    } catch (e: unknown) {
+                        const err = e as Error;
+                        lastError = err;
                         new Notice(`Google Gemini key ...${key.slice(-4)} failed. Trying next.`);
                     }
                 }
             }
         } else if (this.google_keys.length > 0) {
-            lastError = lastError || new Error("Google: 提供了 Key 但未指定模型。");
+            lastError = lastError || new Error("Google: Keys provided but no models defined.");
             console.warn(lastError.message);
         }
 
-        // 3. 最终失败
         if (!openAIEnabled && !googleEnabled && (this.openai_keys.length > 0 || this.google_keys.length > 0)) {
-            new Notice("请在设置中提供API Key和至少一个模型名称。");
-            throw new AllModelsFailedError("提供了 Key 但未指定模型。");
+            new Notice("Please provide API keys and at least one model name in settings.");
+            throw new AllModelsFailedError("Keys provided but no models defined.");
         }
 
         throw new AllModelsFailedError(`All API providers failed. Last error: ${lastError?.message}`);
