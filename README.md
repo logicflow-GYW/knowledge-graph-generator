@@ -33,7 +33,7 @@
 2.  在 **API 设置** 区域：
     * 填入您的 **OpenAI API Keys** 或 **Google Gemini API Keys** （可以两个都填，插件会优先使用 OpenAI，失败后自动切换到 Google）。
     * (可选) 如果您使用第三方代理，请填写 **OpenAI Base URL** 。
-    * 选择您想使用的**主模型**，例如 `gpt-4-turbo-preview` 或 `gemini-1.5-pro-latest` 。
+    * 选择您想使用的**主模型**，例如 `gpt-4-turbo-preview` 或 `gemini-2.5-flash-lite` 。
     * **【更新】** (强烈推荐) 填写 **OpenAI 备用模型** 和 **Google Gemini 备用模型**。当主模型失败时，插件会自动降级到备用模型，确保任务不中断。
 
 ### 3. (重要) 配置输出目录
