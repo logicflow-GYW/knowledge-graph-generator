@@ -124,7 +124,8 @@ export class QueueManagementModal extends Modal {
             if (typeof item === 'string') {
                 return item.toLowerCase().includes(needle);
             }
-            return (item as TaskData).idea.toLowerCase().includes(needle);
+            // 修复：移除多余的 (item as TaskData) 断言，TS 会自动推断 else 分支为 TaskData
+            return item.idea.toLowerCase().includes(needle);
         });
 
         const total = data.length;
