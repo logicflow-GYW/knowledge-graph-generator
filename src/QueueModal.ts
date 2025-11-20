@@ -195,7 +195,7 @@ export class QueueManagementModal extends Modal {
                 .setTooltip('Delete concept')
                 .onClick(async () => {
                     const queue = this.plugin.data.generationQueue;
-                    // 修复：移除不必要的断言，generationQueue 是 string[]
+                    // 修复: 移除不必要的断言，generationQueue 是 string[]
                     const index = queue.indexOf(itemName);
                     if (index > -1) {
                         queue.splice(index, 1);
@@ -203,7 +203,7 @@ export class QueueManagementModal extends Modal {
                         this.plugin.engine.updateStatusBar();
                         this.onOpen(); // 刷新
                     }
-                }) // Promise handling is implicit in async onClick, generally accepted in Obsidian
+                }) 
             );
     }
 
@@ -250,7 +250,8 @@ export class QueueManagementModal extends Modal {
             .addButton(btn => btn
                 .setIcon('refresh-cw')
                 .setTooltip('Re-queue (Generation)')
-                .onClick(async () => {
+                // 修复: 移除 async
+                .onClick(() => {
                     this.plugin.data.discardedPile.splice(this.plugin.data.discardedPile.indexOf(task), 1);
                     this.plugin.engine.addConceptsToQueue([task.idea]); // 使用 engine 的方法
                     this.onOpen();

@@ -5,10 +5,124 @@ import KnowledgeGraphPlugin from './main';
 import { KnowledgeGraphPluginSettings } from './types';
 import { QueueManagementModal } from './QueueModal';
 
-// --- 默认 Prompts ---
-const PROMPT_GENERATOR_DEFAULT = `# Role: 知识系统构建专家...`; // (此处保持原样，省略长文本以节省空间)
-const PROMPT_CRITIC_DEFAULT = `# Role: 知识图谱质量审核员...`;
-const PROMPT_REVISER_DEFAULT = `# Role: 资深知识编辑与内容优化专家...`;
+// --- 默认 Prompts (Mind Crystal 风格 - 最终修复版) ---
+
+// 1. 生成器 Prompt
+const PROMPT_GENERATOR_DEFAULT = `# Role
+你是一位**深度的本质还原者**与**认知架构师**。
+你的目标是为概念 \`{concept}\` 构建一张符合 Obsidian 视觉美学（适合手机阅读）且具有极高思维密度的知识卡片。
+
+# 核心原则
+1.  **第一性原理**：不堆砌名词，而是挖掘该概念底层的“动力学机制”。
+2.  **极简视觉**：严格使用 Obsidian Callout 和 Mermaid。
+3.  **标签规范**：**关键**。标题下方的标签必须符合 Obsidian 格式（例如：\`#认知科学 #博弈论\`），**井号与文字之间不能有空格**。
+4.  **图谱生长**：**关键**。在正文中提到任何相关的、值得深入研究的高价值概念时，必须使用 \`[[WikiLinks]]\` 格式（例如：[[熵增定律]]）。
+5.  **去除非Markdown内容**：不要输出 "Here is the content..." 等废话，直接输出笔记内容。
+
+# 输出内容结构
+
+### {concept}
+#自动推导的主题 #本质定义
+
+> [!QUOTE] ⚡ **核心隐喻**
+> (不要用简单的比喻。请使用一个能揭示**动态机制**或**结构张力**的场景隐喻。限 50 字。)
+
+#### Ⅰ. 系统建模
+> [!NOTE] 💡 **深度解码**
+> (揭示模型背后的系统动力学机制。此处必须包含至少 2 个相关的 [[WikiLink]] 概念。)
+
+\`\`\`mermaid
+graph TD
+    A(核心要素) -->|正反馈/压力| B{关键节点}
+    B -->|路径1| C[结果/现象]
+    C -->|负反馈/调节| A
+    B -->|路径2| D[系统崩溃/变异]
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#ccf,stroke:#333,stroke-width:2px
+\`\`\`
+
+#### Ⅱ. 跨界传送门 (同构映射)
+
+> [!EXAMPLE] 🚀 **迁移至 [意想不到的领域]**
+> **场景：** (寻找结构完全相同的另一个领域，越跨界越好)
+> **🔍 洞察：** (揭示两个看似无关领域背后的**数学/逻辑同构性**。尝试使用 1 个 [[WikiLink]]。)
+
+#### Ⅲ. 边界与悖论 (辩证思考)
+
+> [!WARNING] ⚠️ **认知边界**
+>
+>   * **失效盲区：** (该模型在什么极端条件下会失效)
+>   * **核心悖论：** (内部是否存在自我矛盾？如“效率与公平的互斥”)
+
+#### Ⅳ. 灵魂拷问 (内省)
+
+> [!QUESTION] 🧘 **知行合一**
+>
+>   * **[博弈抉择]:** (设计一个没有标准答案、需要权衡利弊的决策场景)
+>   * **[思维刺针]:** (一句话刺破用户可能的虚荣或认知惰性)
+
+-----
+
+**🏷️ 极简总结：** (一句深刻的、具有哲学意味的金句)`;
+
+// 2. 审核员 Prompt
+const PROMPT_CRITIC_DEFAULT = `# Role: 知识图谱质量审核员 (Knowledge Graph Auditor)
+
+你正在审核一篇关于 "{concept}" 的 Obsidian 知识卡片。
+该卡片必须严格遵循“本质还原者”的极简高密度风格。
+
+## 审核清单 (Checklist)
+1.  **结构完整性**：内容必须包含以下 Markdown 标题或 Callout：
+    * \`> [!QUOTE] ⚡\` (核心隐喻)
+    * \`#### Ⅰ. 系统建模\` (必须包含 Mermaid 图表)
+    * \`#### Ⅱ. 跨界传送门\` (同构映射)
+    * \`#### Ⅲ. 边界与悖论\`
+    * \`#### Ⅳ. 灵魂拷问\`
+2.  **Mermaid 语法检查**：
+    * 必须包含 \`\`\`mermaid\` 代码块。
+    * **关键**：图表方向必须是 \`graph TD\` (从上到下，适配手机竖屏)。
+    * 检查是否存在破坏渲染的特殊字符（如未转义的括号）。
+3.  **自动生长机制**：
+    * 正文中**必须**包含至少 2 个 \`[[WikiLinks]]\` 格式的链接（例如 \`[[熵增]]\` 或 \`[[非连续性]]\`），用于图谱自动扩展。
+4.  **纯净度**：
+    * 必须是纯 Markdown 内容。
+    * **严禁**出现 "好的，这是为您生成的..." 或 "Certainly..." 等 AI 闲聊语。
+
+## 原始内容
+{content}
+
+---
+
+## 输出指令 (严格遵守)
+你必须输出且仅输出以下格式（用于正则提取）：
+
+DECISION: [KEEP 或 DISCARD]
+[REASON: 如果是 DISCARD，请用一句话简述具体原因，例如"Mermaid方向错误(需TD)"或"缺少[[WikiLink]]"]
+\`\`\``;
+
+// 3. 修正者 Prompt
+const PROMPT_REVISER_DEFAULT = `# Role: 资深知识编辑与内容优化专家
+
+你收到的任务是修正一篇关于 "{concept}" 的知识卡片。
+这篇卡片在上一轮审核中被拒绝了。
+
+## 拒绝原因
+{rejection_reason}
+
+## 原始草稿
+{original_content}
+
+## 修正任务
+请根据拒绝原因，重新编写或调整上述内容。
+1.  如果原因是 **"格式错误"** 或 **"缺少标题"**：请严格补充缺失的 \`> [!QUOTE]\`, \`#### Ⅰ. 系统建模\` 等结构。
+2.  如果原因是 **"Mermaid方向错误"** 或 **"缺少 Mermaid"**：请重绘一个 \`graph TD\` (竖向流) 的系统图，确保适合手机阅读。
+3.  如果原因是 **"缺少 WikiLink"**：请在正文的关键概念处添加 \`[[ ]]\`，确保至少有 2 个。
+4.  如果原因是 **"包含 AI 废话"**：请删除所有开场白，只保留 Markdown 正文。
+
+## 输出要求
+* **直接输出修正后的完整 Markdown 内容**。
+* 不要解释你修改了什么，不要输出 "Here is the revised version"。
+* 保持“本质还原者”的高密度、极简风格。`;
 
 // --- 默认设置 ---
 export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
@@ -35,8 +149,13 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     
     // Critic
     critic_mode: "heuristic",
-    critic_required_headers: "# 🧠\n> \n## 💡 核心思想\n## 🎯 适用场景\n## 🛠️ 使用步骤/构成要素\n## 🚀 案例分析\n## 👍 优点 & 👎 缺点\n## 🔗 关联模型",
-    critic_min_content_length: 400,
+    // 严格匹配 Mind_Crystal 的结构
+    critic_required_headers: `> [!QUOTE] ⚡
+#### Ⅰ. 系统建模
+#### Ⅱ. 跨界传送门
+#### Ⅲ. 边界与悖论
+#### Ⅳ. 灵魂拷问`,
+    critic_min_content_length: 200, 
     
     // Reviser
     max_revision_retries: 2,
@@ -53,7 +172,7 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     extract_new_concepts: false
 };
 
-// --- 默认 Prompts 获取函数 (移除 async) ---
+// --- 默认 Prompts 获取函数 ---
 export function getDefaultPrompts() {
     return {
         prompt_generator: PROMPT_GENERATOR_DEFAULT,
@@ -75,9 +194,9 @@ export class KGsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         
-        // 修改：使用 Setting.setHeading()
+        // 修复：移除 "settings" 和插件名称
         new Setting(containerEl)
-            .setName("Knowledge Graph Generator settings")
+            .setName("General")
             .setHeading();
 
         // --- 队列管理 ---
@@ -93,7 +212,8 @@ export class KGsSettingTab extends PluginSettingTab {
             );
 
         // --- API 设置 ---
-        new Setting(containerEl).setName("API settings").setHeading();
+        // 修复：移除 "settings"
+        new Setting(containerEl).setName("API").setHeading();
 
         new Setting(containerEl).setName("OpenAI").setHeading();
         
@@ -218,7 +338,8 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         // --- 引擎设置 ---
-        new Setting(containerEl).setName("Engine settings").setHeading();
+        // 修复：移除 "settings"
+        new Setting(containerEl).setName("Engine").setHeading();
         new Setting(containerEl)
             .setName("Output folder")
             .setDesc("Notes will be saved here.")
@@ -281,6 +402,7 @@ export class KGsSettingTab extends PluginSettingTab {
             );
 
         // --- Critic 设置 ---
+        // 保持 Sentence case "Critic mode"
         new Setting(containerEl)
             .setName("Critic mode")
             .setDesc("Heuristic (fast, formatting check) or AI (smart, content check).")
@@ -322,6 +444,7 @@ export class KGsSettingTab extends PluginSettingTab {
         }
 
         // --- 概念播种 ---
+        // 修复：移除 "settings"
         new Setting(containerEl).setName("Concept seeding").setHeading();
         new Setting(containerEl)
             .setName("Seed box")
@@ -367,7 +490,8 @@ export class KGsSettingTab extends PluginSettingTab {
             );
 
         // --- Prompts 设置 ---
-        new Setting(containerEl).setName("Prompts settings").setHeading();
+        // 修复：移除 "settings"
+        new Setting(containerEl).setName("Prompts").setHeading();
         
         new Setting(containerEl)
             .setName("Generator prompt")
