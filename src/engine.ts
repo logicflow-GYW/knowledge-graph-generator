@@ -60,7 +60,8 @@ export class Engine {
         }
 
         if (addedCount > 0) {
-            this.plugin.savePluginData(); 
+            // 修复：显式标记 promise 为 void，解决 "Promises must be awaited" 错误
+            void this.plugin.savePluginData(); 
             this.updateStatusBar();
         }
         return addedCount;
@@ -68,7 +69,6 @@ export class Engine {
 
     // --- Core Loop ---
     
-    // 修改：去除 async，处理 tick 的 promise
     private start(): void {
         if (this.isRunning) return;
         this.isRunning = true;
@@ -93,7 +93,8 @@ export class Engine {
         }
         new Notice("Knowledge Graph Engine paused.");
         this.updateStatusBar();
-        this.plugin.savePluginData(); 
+        // 修复：显式处理 Promise
+        void this.plugin.savePluginData(); 
     }
 
     private scheduleNextTick(): void {
@@ -102,7 +103,6 @@ export class Engine {
         this.timerId = setTimeout(() => {
             this.tick().catch(error => {
                 console.error("Tick error:", error);
-                // 遇到严重错误可以选择停止或继续，这里仅记录
             });
         }, delay);
     }
@@ -170,7 +170,6 @@ export class Engine {
             const content = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(content);
             this.plugin.data.reviewQueue.push({ idea, content: cleanedContent });
-            // 修改：console.log -> console.debug
             console.debug(`✅ [Generation Success]: ${idea}`);
         } catch (e) {
             if (e instanceof AllModelsFailedError) {
@@ -202,7 +201,6 @@ export class Engine {
                     ideas.forEach(idea => newIdeasFound.add(idea));
                 }
 
-                // 修改：console.log -> console.debug
                 console.debug(`👍 [Approved]: ${task.idea}`);
             } else {
                 task.reason = reason;
@@ -250,12 +248,9 @@ export class Engine {
             const cleanedContent = cleanMarkdownOutput(newContent);
             const revisedTask: TaskData = { ...task, content: cleanedContent };
             this.plugin.data.reviewQueue.push(revisedTask); 
-            // 修改：console.log -> console.debug
             console.debug(`🔄 [Revision Complete]: ${task.idea}`);
         } catch (e: unknown) {
-             // 使用类型更安全的写法，彻底消除 any
             const errMsg = e instanceof Error ? e.message : String(e);
-            // ✅ 修正点：使用 errMsg 而不是 err?.message
             console.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
             this.plugin.data.revisionQueue.unshift(task); 
         }

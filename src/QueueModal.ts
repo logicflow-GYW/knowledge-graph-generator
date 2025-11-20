@@ -146,7 +146,7 @@ export class QueueManagementModal extends Modal {
 
         // 5. 搜索框 (放在 details 内部)
         new Setting(details)
-            .setDesc(`Search ${title}...`) // UI Text: Sentence case
+            .setDesc(`Search ${title.toLowerCase()}...`) // UI Text: Sentence case
             .addText(text => {
                 text.setPlaceholder('Enter keywords...')
                     .setValue(this.searchTerms[key])
@@ -186,16 +186,16 @@ export class QueueManagementModal extends Modal {
 
     private renderGenerationItem(container: HTMLElement, item: string | TaskData) {
         // item 在 generation queue 中通常是 string
-        const itemName = typeof item === 'string' ? item : (item as TaskData).idea;
+        // 修复：移除了不必要的类型断言 (item as TaskData).idea，利用 TS 类型收窄
+        const itemName = typeof item === 'string' ? item : item.idea;
         
         new Setting(container)
             .setName(itemName)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Delete concept')
+                .setTooltip('Delete concept') // UI Text: Sentence case
                 .onClick(async () => {
                     const queue = this.plugin.data.generationQueue;
-                    // 修复: 移除不必要的断言，generationQueue 是 string[]
                     const index = queue.indexOf(itemName);
                     if (index > -1) {
                         queue.splice(index, 1);
@@ -213,7 +213,7 @@ export class QueueManagementModal extends Modal {
             .setName(`[Review] ${task.idea}`)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task')
+                .setTooltip('Discard task') // UI Text: Sentence case
                 .onClick(async () => {
                     this.plugin.data.reviewQueue.splice(this.plugin.data.reviewQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -231,7 +231,7 @@ export class QueueManagementModal extends Modal {
             .setDesc(`Reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task')
+                .setTooltip('Discard task') // UI Text: Sentence case
                 .onClick(async () => {
                     this.plugin.data.revisionQueue.splice(this.plugin.data.revisionQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -249,8 +249,7 @@ export class QueueManagementModal extends Modal {
             .setDesc(`Last reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('refresh-cw')
-                .setTooltip('Re-queue (Generation)')
-                // 修复: 移除 async
+                .setTooltip('Re-queue (generation)') // UI Text: Sentence case
                 .onClick(() => {
                     this.plugin.data.discardedPile.splice(this.plugin.data.discardedPile.indexOf(task), 1);
                     this.plugin.engine.addConceptsToQueue([task.idea]); // 使用 engine 的方法

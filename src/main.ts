@@ -28,7 +28,7 @@ export default class KnowledgeGraphPlugin extends Plugin {
         
         this.engine = new Engine(this);
 
-        const ribbonIconEl = this.addRibbonIcon('brain-circuit', 'Knowledge Graph Generator', (evt: MouseEvent) => {
+        const ribbonIconEl = this.addRibbonIcon('brain-circuit', 'Knowledge graph generator', (evt: MouseEvent) => { // UI Text: Sentence case
             this.engine.toggleEngineState();
         });
         ribbonIconEl.addClass('knowledge-graph-plugin-ribbon-class');
@@ -40,7 +40,7 @@ export default class KnowledgeGraphPlugin extends Plugin {
 
         this.addCommand({
             id: 'toggle-knowledge-graph-engine',
-            name: 'Start/Pause Knowledge Graph generation',
+            name: 'Start/pause knowledge graph generation', // UI Text: Sentence case
             callback: () => {
                 this.engine.toggleEngineState();
             },
@@ -48,7 +48,7 @@ export default class KnowledgeGraphPlugin extends Plugin {
 
         this.addCommand({
             id: 'add-current-note-to-queue',
-            name: 'Add current note title to generation queue',
+            name: 'Add current note title to generation queue', // UI Text: Sentence case (already correct)
             checkCallback: (checking: boolean) => {
                 const file = this.app.workspace.getActiveFile();
                 if (file) {
@@ -61,7 +61,6 @@ export default class KnowledgeGraphPlugin extends Plugin {
             },
         });
         
-        // 修改：console.log -> console.debug
         console.debug('Knowledge Graph plugin loaded.');
     }
 
@@ -70,7 +69,6 @@ export default class KnowledgeGraphPlugin extends Plugin {
     }
 
     async loadSettings() {
-        // 修改：getDefaultPrompts 已经是同步函数，去掉 await
         const defaultPrompts = getDefaultPrompts();
         const savedData = await this.loadData();
         const savedSettings = savedData || {};

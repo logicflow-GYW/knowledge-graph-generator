@@ -194,17 +194,15 @@ export class KGsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         
-        // 修复：移除 "settings" 和插件名称
-        new Setting(containerEl)
-            .setName("General")
-            .setHeading();
+        // 修复：移除了 "General" 标题
+        // 修复：UI Text 调整为 Sentence case
 
         // --- 队列管理 ---
         new Setting(containerEl)
-            .setName("Engine dashboard")
+            .setName("Engine dashboard") // Sentence case
             .setDesc("Manage generation, review, and discarded tasks.")
             .addButton(button => button
-                .setButtonText("Open queue manager")
+                .setButtonText("Open queue manager") // Sentence case
                 .setCta()
                 .onClick(() => {
                     new QueueManagementModal(this.app, this.plugin).open();
@@ -212,13 +210,12 @@ export class KGsSettingTab extends PluginSettingTab {
             );
 
         // --- API 设置 ---
-        // 修复：移除 "settings"
         new Setting(containerEl).setName("API").setHeading();
 
         new Setting(containerEl).setName("OpenAI").setHeading();
         
         new Setting(containerEl)
-            .setName("OpenAI API keys")
+            .setName("OpenAI API keys") // Acronym OK
             .setDesc("One key per line.")
             .addTextArea(text => text
                 .setPlaceholder("sk-...")
@@ -229,7 +226,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("OpenAI base URL")
+            .setName("OpenAI base URL") // Sentence case
             .setDesc("Proxy URL if applicable.")
             .addText(text => text
                 .setPlaceholder("https://api.openai.com/v1")
@@ -240,7 +237,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("OpenAI model (primary)")
+            .setName("OpenAI model (primary)") // Sentence case
             .setDesc("Primary model name.")
             .addText(text => text
                 .setPlaceholder("gpt-4-turbo-preview")
@@ -251,7 +248,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("OpenAI backup model")
+            .setName("OpenAI backup model") // Sentence case
             .setDesc("Used when primary fails.")
             .addText(text => text
                 .setPlaceholder("gpt-3.5-turbo")
@@ -264,7 +261,7 @@ export class KGsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Google Gemini").setHeading();
         
         new Setting(containerEl)
-            .setName("Google Gemini API keys")
+            .setName("Google Gemini API keys") // Acronym OK
             .setDesc("One key per line.")
             .addTextArea(text => text
                 .setPlaceholder("AIzaSy...")
@@ -275,7 +272,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Google Gemini model (primary)")
+            .setName("Google Gemini model (primary)") // Sentence case
             .setDesc("Primary model name.")
             .addText(text => text
                 .setPlaceholder("gemini-1.5-pro-latest")
@@ -286,7 +283,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Google Gemini backup model")
+            .setName("Google Gemini backup model") // Sentence case
             .setDesc("Used when primary fails.")
             .addText(text => text
                 .setPlaceholder("gemini-1.0-pro")
@@ -297,7 +294,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Key cooldown (seconds)")
+            .setName("Key cooldown (seconds)") // Sentence case
             .setDesc("Wait time after key failure.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.failover_cooldown_seconds))
@@ -310,9 +307,9 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         // --- LLM 参数设置 ---
-        new Setting(containerEl).setName("LLM parameters").setHeading();
+        new Setting(containerEl).setName("LLM parameters").setHeading(); // Acronym OK
         new Setting(containerEl)
-            .setName("Generation temperature")
+            .setName("Generation temperature") // Sentence case
             .setDesc("0.0 to 2.0 (Creative vs Deterministic).")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_temperature))
@@ -325,7 +322,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Max tokens")
+            .setName("Max tokens") // Sentence case
             .setDesc("Maximum tokens per response.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_max_tokens))
@@ -338,10 +335,9 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         // --- 引擎设置 ---
-        // 修复：移除 "settings"
         new Setting(containerEl).setName("Engine").setHeading();
         new Setting(containerEl)
-            .setName("Output folder")
+            .setName("Output folder") // Sentence case
             .setDesc("Notes will be saved here.")
             .addText(text => text
                 .setPlaceholder("KnowledgeGraphNotes")
@@ -352,7 +348,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Generation batch size")
+            .setName("Generation batch size") // Sentence case
             .setDesc("Number of tasks per cycle.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_batch_size))
@@ -365,7 +361,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Request delay (seconds)")
+            .setName("Request delay (seconds)") // Sentence case
             .setDesc("Wait time between batches.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.request_delay))
@@ -378,7 +374,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("Max revision retries")
+            .setName("Max revision retries") // Sentence case
             .setDesc("Maximum attempts before discarding.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.max_revision_retries))
@@ -391,7 +387,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("Extract new concepts")
+            .setName("Extract new concepts") // Sentence case
             .setDesc("Automatically add [[Wikilinks]] from approved notes to generation queue.")
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.extract_new_concepts)
@@ -402,9 +398,8 @@ export class KGsSettingTab extends PluginSettingTab {
             );
 
         // --- Critic 设置 ---
-        // 保持 Sentence case "Critic mode"
         new Setting(containerEl)
-            .setName("Critic mode")
+            .setName("Critic mode") // Sentence case
             .setDesc("Heuristic (fast, formatting check) or AI (smart, content check).")
             .addDropdown(dropdown => dropdown
                 .addOption("heuristic", "Heuristic")
@@ -418,7 +413,7 @@ export class KGsSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.critic_mode === "heuristic") {
             new Setting(containerEl)
-                .setName("Heuristic: required headers")
+                .setName("Heuristic: required headers") // Sentence case
                 .setDesc("Notes must contain these headers (one per line).")
                 .addTextArea(text => {
                     text.setValue(this.plugin.settings.critic_required_headers)
@@ -430,7 +425,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 });
             
             new Setting(containerEl)
-                .setName("Heuristic: min content length")
+                .setName("Heuristic: min content length") // Sentence case
                 .setDesc("Minimum character count.")
                 .addText(text => text
                     .setValue(String(this.plugin.settings.critic_min_content_length))
@@ -444,10 +439,9 @@ export class KGsSettingTab extends PluginSettingTab {
         }
 
         // --- 概念播种 ---
-        // 修复：移除 "settings"
-        new Setting(containerEl).setName("Concept seeding").setHeading();
+        new Setting(containerEl).setName("Concept seeding").setHeading(); // Sentence case
         new Setting(containerEl)
-            .setName("Seed box")
+            .setName("Seed box") // Sentence case
             .setDesc("Enter concepts here, one per line.")
             .addTextArea(text => {
                 text.setPlaceholder("First Principles\nOccam's Razor\n...")
@@ -461,7 +455,7 @@ export class KGsSettingTab extends PluginSettingTab {
         
         new Setting(containerEl)
             .addButton(button => button
-                .setButtonText("Seed to queue")
+                .setButtonText("Seed to queue") // Sentence case
                 .setCta()
                 .onClick(async () => {
                     const rawText = this.plugin.settings.seedConcepts;
@@ -490,11 +484,10 @@ export class KGsSettingTab extends PluginSettingTab {
             );
 
         // --- Prompts 设置 ---
-        // 修复：移除 "settings"
         new Setting(containerEl).setName("Prompts").setHeading();
         
         new Setting(containerEl)
-            .setName("Generator prompt")
+            .setName("Generator prompt") // Sentence case
             .setDesc("Prompt for generating new content.")
             .addTextArea(text => {
                 text.setValue(this.plugin.settings.prompt_generator)
@@ -507,7 +500,7 @@ export class KGsSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.critic_mode === "ai") {
             new Setting(containerEl)
-                .setName("Critic prompt")
+                .setName("Critic prompt") // Sentence case
                 .setDesc("Prompt for AI content review.")
                 .addTextArea(text => {
                     text.setValue(this.plugin.settings.prompt_critic)
@@ -520,7 +513,7 @@ export class KGsSettingTab extends PluginSettingTab {
         }
         
         new Setting(containerEl)
-            .setName("Reviser prompt")
+            .setName("Reviser prompt") // Sentence case
             .setDesc("Prompt for revising rejected content.")
             .addTextArea(text => {
                 text.setValue(this.plugin.settings.prompt_reviser)
