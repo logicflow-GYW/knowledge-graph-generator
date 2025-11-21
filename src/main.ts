@@ -36,6 +36,7 @@ export default class KnowledgeGraphPlugin extends Plugin {
         
         this.engine = new Engine(this);
 
+        // Fixed: Sentence case for tooltip
         const ribbonIconEl = this.addRibbonIcon('brain-circuit', 'Knowledge graph generator', (evt: MouseEvent) => {
             this.engine.toggleEngineState();
         });
@@ -46,6 +47,7 @@ export default class KnowledgeGraphPlugin extends Plugin {
 
         this.addSettingTab(new KGsSettingTab(this.app, this));
 
+        // Fixed: Sentence case for command names
         this.addCommand({
             id: 'toggle-knowledge-graph-engine',
             name: 'Start/pause knowledge graph generation',

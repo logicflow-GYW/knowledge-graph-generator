@@ -1,7 +1,5 @@
 // src/utils.ts
 
-import { KnowledgeGraphPluginSettings } from './types';
-
 export class Logger {
     private static isDebug: boolean = false;
 
@@ -9,17 +7,19 @@ export class Logger {
         Logger.isDebug = debug;
     }
 
-    static log(message: string, ...args: any[]) {
+    // Changed any[] to unknown[] to satisfy linter
+    // Changed console.log to console.debug to satisfy linter
+    static log(message: string, ...args: unknown[]) {
         if (Logger.isDebug) {
-            console.log(`[KG-Gen] ${message}`, ...args);
+            console.debug(`[KG-Gen] ${message}`, ...args);
         }
     }
 
-    static warn(message: string, ...args: any[]) {
+    static warn(message: string, ...args: unknown[]) {
         console.warn(`[KG-Gen] ${message}`, ...args);
     }
 
-    static error(message: string, ...args: any[]) {
+    static error(message: string, ...args: unknown[]) {
         console.error(`[KG-Gen] ${message}`, ...args);
     }
 }

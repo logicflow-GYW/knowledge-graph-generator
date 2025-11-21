@@ -4,9 +4,9 @@ import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import KnowledgeGraphPlugin from './main';
 import { KnowledgeGraphPluginSettings } from './types';
 import { QueueManagementModal } from './QueueModal';
-import { Logger } from './utils'; // 引入 Logger
+import { Logger } from './utils';
 
-// ... (PROMPTS 常量保持不变，此处省略以节省篇幅，请保留原来的内容) ...
+// ... (PROMPTS 常量保持不变，请在粘贴时保留原来的 PROMPT 常量内容) ...
 const PROMPT_GENERATOR_DEFAULT = `# Role
 你是一位**深度的本质还原者**与**认知架构师**。
 你的目标是为概念 \`{concept}\` 构建一张符合 Obsidian 视觉美学（适合手机阅读）且具有极高思维密度的知识卡片。
@@ -143,7 +143,7 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     // 系统
     generation_batch_size: 5,
     request_delay: 5,
-    debug_mode: false, // 新增默认值
+    debug_mode: false,
     
     // Critic
     critic_mode: "heuristic",
@@ -190,6 +190,7 @@ export class KGsSettingTab extends PluginSettingTab {
         containerEl.empty();
         
         // --- 队列管理 ---
+        // Fixed: Sentence case
         new Setting(containerEl)
             .setName("Engine dashboard") 
             .setDesc("Manage generation, review, and discarded tasks.")
@@ -206,6 +207,7 @@ export class KGsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl).setName("OpenAI").setHeading();
         
+        // Fixed: Sentence case for all settings
         new Setting(containerEl)
             .setName("OpenAI API keys") 
             .setDesc("One key per line.")

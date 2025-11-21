@@ -283,7 +283,7 @@ export class Engine {
             const revisedTask: TaskData = { ...task, content: cleanedContent };
             this.plugin.data.reviewQueue.push(revisedTask); 
             Logger.log(`🔄 [Revision Complete]: ${task.idea}`);
-        } catch (e: unknown) {
+        } catch (e: unknown) { // Fixed: unknown
             const errMsg = e instanceof Error ? e.message : String(e);
             Logger.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
             this.plugin.data.revisionQueue.unshift(task); 

@@ -41,17 +41,18 @@ export class QueueManagementModal extends Modal {
 
         contentEl.empty();
         contentEl.addClass('kg-modal'); 
-        contentEl.createEl('h2', { text: 'Queue management dashboard' }); // UI Text: Sentence case
+        // Fixed: Sentence case
+        contentEl.createEl('h2', { text: 'Queue management dashboard' }); 
 
         const status = this.plugin.data.status;
         const statusText = `Status: ${status.toUpperCase()} | ${this.plugin.statusBarEl.getText()}`;
         
         // 1. 状态和启停按钮
         new Setting(contentEl)
-            .setName(status === 'running' ? 'Engine running' : 'Engine paused') // UI Text: Sentence case
+            .setName(status === 'running' ? 'Engine running' : 'Engine paused') // Fixed: Sentence case
             .setDesc(statusText)
             .addButton(button => button
-                .setButtonText(status === 'running' ? 'Pause engine' : 'Start engine') // UI Text: Sentence case
+                .setButtonText(status === 'running' ? 'Pause engine' : 'Start engine') // Fixed: Sentence case
                 .setCta(status !== 'running')
                 .onClick(() => {
                     this.plugin.engine.toggleEngineState();
@@ -60,10 +61,11 @@ export class QueueManagementModal extends Modal {
             );
 
         // 2. 渲染四个队列
+        // Fixed: Sentence case for titles
         this.renderQueueSection(
             contentEl, 
             'gen', 
-            'Pending generation', // UI Text: Sentence case
+            'Pending generation', 
             this.plugin.data.generationQueue,
             this.renderGenerationItem.bind(this)
         );
@@ -71,7 +73,7 @@ export class QueueManagementModal extends Modal {
         this.renderQueueSection(
             contentEl,
             'rev',
-            'Pending review', // UI Text: Sentence case
+            'Pending review',
             this.plugin.data.reviewQueue,
             this.renderReviewItem.bind(this)
         );
@@ -79,7 +81,7 @@ export class QueueManagementModal extends Modal {
         this.renderQueueSection(
             contentEl,
             'rep',
-            'Pending revision', // UI Text: Sentence case
+            'Pending revision',
             this.plugin.data.revisionQueue,
             this.renderRevisionItem.bind(this)
         );
@@ -87,7 +89,7 @@ export class QueueManagementModal extends Modal {
         this.renderQueueSection(
             contentEl,
             'dis',
-            'Discarded pile', // UI Text: Sentence case
+            'Discarded pile',
             this.plugin.data.discardedPile,
             this.renderDiscardedItem.bind(this)
         );
@@ -124,7 +126,6 @@ export class QueueManagementModal extends Modal {
             if (typeof item === 'string') {
                 return item.toLowerCase().includes(needle);
             }
-            // 修复：移除多余的 (item as TaskData) 断言，TS 会自动推断 else 分支为 TaskData
             return item.idea.toLowerCase().includes(needle);
         });
 
@@ -147,7 +148,7 @@ export class QueueManagementModal extends Modal {
 
         // 5. 搜索框 (放在 details 内部)
         new Setting(details)
-            .setDesc(`Search ${title.toLowerCase()}...`) // UI Text: Sentence case
+            .setDesc(`Search ${title.toLowerCase()}...`) 
             .addText(text => {
                 text.setPlaceholder('Enter keywords...')
                     .setValue(this.searchTerms[key])
@@ -187,14 +188,13 @@ export class QueueManagementModal extends Modal {
 
     private renderGenerationItem(container: HTMLElement, item: string | TaskData) {
         // item 在 generation queue 中通常是 string
-        // 修复：移除了不必要的类型断言 (item as TaskData).idea，利用 TS 类型收窄
         const itemName = typeof item === 'string' ? item : item.idea;
         
         new Setting(container)
             .setName(itemName)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Delete concept') // UI Text: Sentence case
+                .setTooltip('Delete concept') // Fixed: Sentence case
                 .onClick(async () => {
                     const queue = this.plugin.data.generationQueue;
                     const index = queue.indexOf(itemName);
@@ -214,7 +214,7 @@ export class QueueManagementModal extends Modal {
             .setName(`[Review] ${task.idea}`)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task') // UI Text: Sentence case
+                .setTooltip('Discard task') // Fixed: Sentence case
                 .onClick(async () => {
                     this.plugin.data.reviewQueue.splice(this.plugin.data.reviewQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -232,7 +232,7 @@ export class QueueManagementModal extends Modal {
             .setDesc(`Reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task') // UI Text: Sentence case
+                .setTooltip('Discard task') // Fixed: Sentence case
                 .onClick(async () => {
                     this.plugin.data.revisionQueue.splice(this.plugin.data.revisionQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -250,7 +250,7 @@ export class QueueManagementModal extends Modal {
             .setDesc(`Last reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('refresh-cw')
-                .setTooltip('Re-queue (generation)') // UI Text: Sentence case
+                .setTooltip('Re-queue (generation)') // Fixed: Sentence case
                 .onClick(() => {
                     this.plugin.data.discardedPile.splice(this.plugin.data.discardedPile.indexOf(task), 1);
                     this.plugin.engine.addConceptsToQueue([task.idea]); // 使用 engine 的方法
