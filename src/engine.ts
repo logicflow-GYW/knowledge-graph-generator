@@ -5,7 +5,7 @@ import KnowledgeGraphPlugin from "./main";
 import { APIHandler, AllModelsFailedError } from "./apiHandler";
 import { Critic } from "./critic";
 import { Reviser } from "./reviser";
-import { sanitizeFilename, extractNewIdeas, cleanMarkdownOutput } from "./utils";
+import { sanitizeFilename, extractNewIdeas, cleanMarkdownOutput, Logger } from "./utils";
 import { TaskData } from "./types";
 
 export class Engine {
@@ -72,12 +72,11 @@ export class Engine {
         if (this.isRunning) return;
         this.isRunning = true;
         this.plugin.data.status = "running";
-        // 修改：Sentence case - Knowledge graph engine started!
         new Notice("Knowledge graph engine started!");
         this.updateStatusBar();
         
         this.tick().catch(error => {
-            console.error("Tick error during start:", error);
+            Logger.error("Tick error during start:", error);
             this.stop();
         });
     }
@@ -90,7 +89,6 @@ export class Engine {
             clearTimeout(this.timerId);
             this.timerId = null;
         }
-        // 修改：Sentence case - Knowledge graph engine paused.
         new Notice("Knowledge graph engine paused.");
         this.updateStatusBar();
         void this.plugin.savePluginData(); 
@@ -101,7 +99,7 @@ export class Engine {
         const delay = this.plugin.settings.request_delay * 1000;
         this.timerId = setTimeout(() => {
             this.tick().catch(error => {
-                console.error("Tick error:", error);
+                Logger.error("Tick error:", error);
             });
         }, delay);
     }
@@ -136,7 +134,7 @@ export class Engine {
             }
 
         } catch (error) {
-            console.error("Engine fatal error:", error);
+            Logger.error("Engine fatal error:", error);
             new Notice("Engine encountered an error and paused. Check console.");
             this.stop(); 
             return;
@@ -168,11 +166,16 @@ export class Engine {
         try {
             const content = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(content);
+            
+            // 【修改】保存内容到缓存文件，而不是仅保留在内存
+            await this.plugin.persistence.saveTaskContent(idea, cleanedContent);
+            
+            // 队列中只保存元数据，content 可选
             this.plugin.data.reviewQueue.push({ idea, content: cleanedContent });
-            console.debug(`✅ [Generation Success]: ${idea}`);
+            Logger.log(`✅ [Generation Success]: ${idea}`);
         } catch (e) {
             if (e instanceof AllModelsFailedError) {
-                console.error(`❌ [Generation Failed]: ${idea} - ${e.message}`);
+                Logger.error(`❌ [Generation Failed]: ${idea} - ${e.message}`);
                 this.plugin.data.generationQueue.unshift(idea); 
             }
         }
@@ -191,21 +194,36 @@ export class Engine {
         let newIdeasFound: Set<string> = new Set();
 
         for (const task of tasksToReview) {
-            const { isApproved, reason } = await this.critic.judge(task.content);
+            // 【修改】如果内存中没有内容（刚加载），从文件加载
+            let content = task.content;
+            if (!content) {
+                content = await this.plugin.persistence.loadTaskContent(task.idea);
+            }
+
+            if (!content) {
+                Logger.error(`❌ [Critic Error]: Content not found for ${task.idea}. Discarding.`);
+                this.plugin.data.discardedPile.push({ ...task, reason: "Content file lost" });
+                continue;
+            }
+
+            const { isApproved, reason } = await this.critic.judge(content);
             if (isApproved) {
-                await this.saveNote(task.idea, task.content);
+                await this.saveNote(task.idea, content);
+                // 【修改】批准后，清理缓存文件
+                await this.plugin.persistence.deleteTaskContent(task.idea);
                 
                 if (this.plugin.settings.extract_new_concepts) {
-                    const ideas = extractNewIdeas(task.content);
+                    const ideas = extractNewIdeas(content);
                     ideas.forEach(idea => newIdeasFound.add(idea));
                 }
 
-                console.debug(`👍 [Approved]: ${task.idea}`);
+                Logger.log(`👍 [Approved]: ${task.idea}`);
             } else {
                 task.reason = reason;
                 task.retries = (task.retries || 0) + 1;
+                // 拒绝后，内容依然保存在缓存中，无需重新保存，只需移动队列
                 this.plugin.data.revisionQueue.push(task);
-                console.warn(`👎 [Rejected]: ${task.idea} - ${reason}`);
+                Logger.warn(`👎 [Rejected]: ${task.idea} - ${reason}`);
             }
         }
 
@@ -230,7 +248,9 @@ export class Engine {
         for (const task of tasksToRevise) {
             if ((task.retries || 0) >= this.plugin.settings.max_revision_retries) {
                 this.plugin.data.discardedPile.push(task); 
-                console.error(`💀 [Give up]: ${task.idea} max retries reached.`);
+                // 【修改】彻底丢弃时，是否删除缓存？目前保留以便手动重试，或者您可以选择删除
+                // await this.plugin.persistence.deleteTaskContent(task.idea); 
+                Logger.error(`💀 [Give up]: ${task.idea} max retries reached.`);
                 continue; 
             }
             await this.revisionTask(task);
@@ -241,16 +261,31 @@ export class Engine {
     }
 
     private async revisionTask(task: TaskData): Promise<void> {
-        const prompt = this.reviser.createRevisionPrompt(task.idea, task.content, task.reason || "unknown");
+        // 【修改】确保有内容
+        let content = task.content;
+        if (!content) {
+            content = await this.plugin.persistence.loadTaskContent(task.idea);
+        }
+        if (!content) {
+             Logger.error(`Content missing for revision: ${task.idea}`);
+             this.plugin.data.discardedPile.push(task);
+             return;
+        }
+
+        const prompt = this.reviser.createRevisionPrompt(task.idea, content, task.reason || "unknown");
         try {
             const newContent = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(newContent);
+            
+            // 【修改】更新缓存文件
+            await this.plugin.persistence.saveTaskContent(task.idea, cleanedContent);
+
             const revisedTask: TaskData = { ...task, content: cleanedContent };
             this.plugin.data.reviewQueue.push(revisedTask); 
-            console.debug(`🔄 [Revision Complete]: ${task.idea}`);
+            Logger.log(`🔄 [Revision Complete]: ${task.idea}`);
         } catch (e: unknown) {
             const errMsg = e instanceof Error ? e.message : String(e);
-            console.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
+            Logger.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
             this.plugin.data.revisionQueue.unshift(task); 
         }
     }
@@ -264,7 +299,7 @@ export class Engine {
             try {
                 await this.app.vault.createFolder(folderPath);
             } catch (error) {
-                console.error(`Create folder failed: ${folderPath}`, error);
+                Logger.error(`Create folder failed: ${folderPath}`, error);
                 new Notice(`Cannot create folder: ${folderPath}`);
                 return; 
             }
@@ -282,7 +317,7 @@ export class Engine {
                 new Notice(`Note created: ${filename}`);
             }
         } catch (error) {
-            console.error(`Save note failed: ${filePath}`, error);
+            Logger.error(`Save note failed: ${filePath}`, error);
             new Notice(`Cannot save note: ${filename}`);
         }
     }

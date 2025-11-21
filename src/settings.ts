@@ -4,10 +4,9 @@ import { App, PluginSettingTab, Setting, Notice } from 'obsidian';
 import KnowledgeGraphPlugin from './main';
 import { KnowledgeGraphPluginSettings } from './types';
 import { QueueManagementModal } from './QueueModal';
+import { Logger } from './utils'; // 引入 Logger
 
-// --- 默认 Prompts (Mind Crystal 风格 - 最终修复版) ---
-
-// 1. 生成器 Prompt
+// ... (PROMPTS 常量保持不变，此处省略以节省篇幅，请保留原来的内容) ...
 const PROMPT_GENERATOR_DEFAULT = `# Role
 你是一位**深度的本质还原者**与**认知架构师**。
 你的目标是为概念 \`{concept}\` 构建一张符合 Obsidian 视觉美学（适合手机阅读）且具有极高思维密度的知识卡片。
@@ -65,7 +64,6 @@ graph TD
 
 **🏷️ 极简总结：** (一句深刻的、具有哲学意味的金句)`;
 
-// 2. 审核员 Prompt
 const PROMPT_CRITIC_DEFAULT = `# Role: 知识图谱质量审核员 (Knowledge Graph Auditor)
 
 你正在审核一篇关于 "{concept}" 的 Obsidian 知识卡片。
@@ -100,7 +98,6 @@ DECISION: [KEEP 或 DISCARD]
 [REASON: 如果是 DISCARD，请用一句话简述具体原因，例如"Mermaid方向错误(需TD)"或"缺少[[WikiLink]]"]
 \`\`\``;
 
-// 3. 修正者 Prompt
 const PROMPT_REVISER_DEFAULT = `# Role: 资深知识编辑与内容优化专家
 
 你收到的任务是修正一篇关于 "{concept}" 的知识卡片。
@@ -146,10 +143,10 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     // 系统
     generation_batch_size: 5,
     request_delay: 5,
+    debug_mode: false, // 新增默认值
     
     // Critic
     critic_mode: "heuristic",
-    // 严格匹配 Mind_Crystal 的结构
     critic_required_headers: `> [!QUOTE] ⚡
 #### Ⅰ. 系统建模
 #### Ⅱ. 跨界传送门
@@ -172,7 +169,6 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     extract_new_concepts: false
 };
 
-// --- 默认 Prompts 获取函数 ---
 export function getDefaultPrompts() {
     return {
         prompt_generator: PROMPT_GENERATOR_DEFAULT,
@@ -181,7 +177,6 @@ export function getDefaultPrompts() {
     };
 }
 
-// --- 设置选项卡 ---
 export class KGsSettingTab extends PluginSettingTab {
     plugin: KnowledgeGraphPlugin;
 
@@ -196,10 +191,10 @@ export class KGsSettingTab extends PluginSettingTab {
         
         // --- 队列管理 ---
         new Setting(containerEl)
-            .setName("Engine dashboard") // Sentence case
+            .setName("Engine dashboard") 
             .setDesc("Manage generation, review, and discarded tasks.")
             .addButton(button => button
-                .setButtonText("Open queue manager") // Sentence case
+                .setButtonText("Open queue manager") 
                 .setCta()
                 .onClick(() => {
                     new QueueManagementModal(this.app, this.plugin).open();
@@ -212,7 +207,7 @@ export class KGsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("OpenAI").setHeading();
         
         new Setting(containerEl)
-            .setName("OpenAI API keys") // Acronym OK
+            .setName("OpenAI API keys") 
             .setDesc("One key per line.")
             .addTextArea(text => text
                 .setPlaceholder("sk-...")
@@ -223,7 +218,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("OpenAI base URL") // Sentence case
+            .setName("OpenAI base URL") 
             .setDesc("Proxy URL if applicable.")
             .addText(text => text
                 .setPlaceholder("https://api.openai.com/v1")
@@ -234,7 +229,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("OpenAI model (primary)") // Sentence case
+            .setName("OpenAI model (primary)") 
             .setDesc("Primary model name.")
             .addText(text => text
                 .setPlaceholder("gpt-4-turbo-preview")
@@ -245,7 +240,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("OpenAI backup model") // Sentence case
+            .setName("OpenAI backup model") 
             .setDesc("Used when primary fails.")
             .addText(text => text
                 .setPlaceholder("gpt-3.5-turbo")
@@ -258,7 +253,7 @@ export class KGsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Google Gemini").setHeading();
         
         new Setting(containerEl)
-            .setName("Google Gemini API keys") // Acronym OK
+            .setName("Google Gemini API keys") 
             .setDesc("One key per line.")
             .addTextArea(text => text
                 .setPlaceholder("AIzaSy...")
@@ -269,7 +264,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Google Gemini model (primary)") // Sentence case
+            .setName("Google Gemini model (primary)") 
             .setDesc("Primary model name.")
             .addText(text => text
                 .setPlaceholder("gemini-1.5-pro-latest")
@@ -280,7 +275,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Google Gemini backup model") // Sentence case
+            .setName("Google Gemini backup model") 
             .setDesc("Used when primary fails.")
             .addText(text => text
                 .setPlaceholder("gemini-1.0-pro")
@@ -291,7 +286,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Key cooldown (seconds)") // Sentence case
+            .setName("Key cooldown (seconds)") 
             .setDesc("Wait time after key failure.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.failover_cooldown_seconds))
@@ -304,10 +299,9 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         // --- LLM 参数设置 ---
-        new Setting(containerEl).setName("LLM parameters").setHeading(); // Acronym OK
+        new Setting(containerEl).setName("LLM parameters").setHeading();
         new Setting(containerEl)
-            .setName("Generation temperature") // Sentence case
-            // 修改：Deterministic -> deterministic
+            .setName("Generation temperature") 
             .setDesc("0.0 to 2.0 (Creative vs deterministic).")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_temperature))
@@ -320,7 +314,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Max tokens") // Sentence case
+            .setName("Max tokens") 
             .setDesc("Maximum tokens per response.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_max_tokens))
@@ -335,7 +329,7 @@ export class KGsSettingTab extends PluginSettingTab {
         // --- 引擎设置 ---
         new Setting(containerEl).setName("Engine").setHeading();
         new Setting(containerEl)
-            .setName("Output folder") // Sentence case
+            .setName("Output folder") 
             .setDesc("Notes will be saved here.")
             .addText(text => text
                 .setPlaceholder("KnowledgeGraphNotes")
@@ -346,7 +340,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Generation batch size") // Sentence case
+            .setName("Generation batch size") 
             .setDesc("Number of tasks per cycle.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_batch_size))
@@ -359,7 +353,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
 
         new Setting(containerEl)
-            .setName("Request delay (seconds)") // Sentence case
+            .setName("Request delay (seconds)") 
             .setDesc("Wait time between batches.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.request_delay))
@@ -372,7 +366,18 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("Max revision retries") // Sentence case
+            .setName("Debug mode")
+            .setDesc("Enable to see verbose logs in console.")
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.debug_mode)
+                .onChange(async (value) => {
+                    this.plugin.settings.debug_mode = value;
+                    Logger.setDebugMode(value); // 实时生效
+                    await this.plugin.saveSettings();
+                }));
+        
+        new Setting(containerEl)
+            .setName("Max revision retries") 
             .setDesc("Maximum attempts before discarding.")
             .addText(text => text
                 .setValue(String(this.plugin.settings.max_revision_retries))
@@ -385,7 +390,7 @@ export class KGsSettingTab extends PluginSettingTab {
                 }));
         
         new Setting(containerEl)
-            .setName("Extract new concepts") // Sentence case
+            .setName("Extract new concepts") 
             .setDesc("Automatically add [[Wikilinks]] from approved notes to generation queue.")
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.extract_new_concepts)
@@ -397,11 +402,10 @@ export class KGsSettingTab extends PluginSettingTab {
 
         // --- Critic 设置 ---
         new Setting(containerEl)
-            .setName("Critic mode") // Sentence case
+            .setName("Critic mode") 
             .setDesc("Heuristic (fast, formatting check) or AI (smart, content check).")
             .addDropdown(dropdown => dropdown
                 .addOption("heuristic", "Heuristic")
-                // 修改：Artificial intelligence (AI) - Sentence case
                 .addOption("ai", "Artificial intelligence (AI)")
                 .setValue(this.plugin.settings.critic_mode)
                 .onChange(async (value: 'heuristic' | 'ai') => {
@@ -412,7 +416,7 @@ export class KGsSettingTab extends PluginSettingTab {
 
         if (this.plugin.settings.critic_mode === "heuristic") {
             new Setting(containerEl)
-                .setName("Heuristic: required headers") // Sentence case
+                .setName("Heuristic: required headers") 
                 .setDesc("Notes must contain these headers (one per line).")
                 .addTextArea(text => {
                     text.setValue(this.plugin.settings.critic_required_headers)
@@ -420,11 +424,11 @@ export class KGsSettingTab extends PluginSettingTab {
                             this.plugin.settings.critic_required_headers = value;
                             await this.plugin.saveSettings();
                         });
-                    text.inputEl.addClass("kg-textarea-short"); // 使用 CSS 类
+                    text.inputEl.addClass("kg-textarea-short"); 
                 });
             
             new Setting(containerEl)
-                .setName("Heuristic: min content length") // Sentence case
+                .setName("Heuristic: min content length") 
                 .setDesc("Minimum character count.")
                 .addText(text => text
                     .setValue(String(this.plugin.settings.critic_min_content_length))
@@ -438,24 +442,23 @@ export class KGsSettingTab extends PluginSettingTab {
         }
 
         // --- 概念播种 ---
-        new Setting(containerEl).setName("Concept seeding").setHeading(); // Sentence case
+        new Setting(containerEl).setName("Concept seeding").setHeading(); 
         new Setting(containerEl)
-            .setName("Seed box") // Sentence case
+            .setName("Seed box") 
             .setDesc("Enter concepts here, one per line.")
             .addTextArea(text => {
-                // 修改：First principles\nOccam's razor (Sentence case)
                 text.setPlaceholder("First principles\nOccam's razor\n...")
                     .setValue(this.plugin.settings.seedConcepts)
                     .onChange(async (value) => {
                         this.plugin.settings.seedConcepts = value;
                         await this.plugin.saveSettings();
                     });
-                text.inputEl.addClass("kg-textarea-medium"); // 使用 CSS 类
+                text.inputEl.addClass("kg-textarea-medium"); 
             });
         
         new Setting(containerEl)
             .addButton(button => button
-                .setButtonText("Seed to queue") // Sentence case
+                .setButtonText("Seed to queue") 
                 .setCta()
                 .onClick(async () => {
                     const rawText = this.plugin.settings.seedConcepts;
@@ -476,7 +479,6 @@ export class KGsSettingTab extends PluginSettingTab {
                     }
                     new Notice(noticeMessage, 5000);
 
-                    // 清空播种箱
                     this.plugin.settings.seedConcepts = "";
                     await this.plugin.saveSettings();
                     this.display(); 
@@ -487,7 +489,7 @@ export class KGsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("Prompts").setHeading();
         
         new Setting(containerEl)
-            .setName("Generator prompt") // Sentence case
+            .setName("Generator prompt") 
             .setDesc("Prompt for generating new content.")
             .addTextArea(text => {
                 text.setValue(this.plugin.settings.prompt_generator)
@@ -495,12 +497,12 @@ export class KGsSettingTab extends PluginSettingTab {
                         this.plugin.settings.prompt_generator = value;
                         await this.plugin.saveSettings();
                     });
-                text.inputEl.addClass("kg-textarea-tall"); // 使用 CSS 类
+                text.inputEl.addClass("kg-textarea-tall"); 
             });
 
         if (this.plugin.settings.critic_mode === "ai") {
             new Setting(containerEl)
-                .setName("Critic prompt") // Sentence case
+                .setName("Critic prompt") 
                 .setDesc("Prompt for AI content review.")
                 .addTextArea(text => {
                     text.setValue(this.plugin.settings.prompt_critic)
@@ -508,12 +510,12 @@ export class KGsSettingTab extends PluginSettingTab {
                             this.plugin.settings.prompt_critic = value;
                             await this.plugin.saveSettings();
                         });
-                    text.inputEl.addClass("kg-textarea-tall"); // 使用 CSS 类
+                    text.inputEl.addClass("kg-textarea-tall"); 
                 });
         }
         
         new Setting(containerEl)
-            .setName("Reviser prompt") // Sentence case
+            .setName("Reviser prompt") 
             .setDesc("Prompt for revising rejected content.")
             .addTextArea(text => {
                 text.setValue(this.plugin.settings.prompt_reviser)
@@ -521,7 +523,7 @@ export class KGsSettingTab extends PluginSettingTab {
                         this.plugin.settings.prompt_reviser = value;
                         await this.plugin.saveSettings();
                     });
-                text.inputEl.addClass("kg-textarea-tall"); // 使用 CSS 类
+                text.inputEl.addClass("kg-textarea-tall"); 
             });
     }
 }
