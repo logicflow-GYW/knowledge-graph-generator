@@ -1,3 +1,9 @@
+
+### 2. 审核提示词 (Critic)
+**文件名：** `prompt_critic.txt`
+**用途：** 让 AI 检查生成的卡片是否合格。需传入 `{concept}` 和 `{content}` (上一步生成的内容)。
+
+```markdown
 # Role: 知识图谱质量审核员 (Knowledge Graph Auditor)
 
 你正在审核一篇关于 "{concept}" 的 Obsidian 知识卡片。
@@ -12,11 +18,7 @@
     * `#### Ⅳ. 灵魂拷问`
 2.  **Mermaid 语法检查**：
     * 必须包含 ````mermaid` 代码块。
-<<<<<<< HEAD
     * **关键**：图表方向必须是 `graph TD` (从上到下，适配手机竖屏)。
-=======
-    * 图表方向必须是 `graph LR` (适配手机)。
->>>>>>> ea701b9bc2d4b20e096462ca1b69585cede2e05f
     * 检查是否存在破坏渲染的特殊字符（如未转义的括号）。
 3.  **自动生长机制**：
     * 正文中**必须**包含至少 2 个 `[[WikiLinks]]` 格式的链接（例如 `[[熵增]]` 或 `[[非连续性]]`），用于图谱自动扩展。
@@ -33,10 +35,4 @@
 你必须输出且仅输出以下格式（用于正则提取）：
 
 DECISION: [KEEP 或 DISCARD]
-<<<<<<< HEAD
 [REASON: 如果是 DISCARD，请用一句话简述具体原因，例如"Mermaid方向错误(需TD)"或"缺少[[WikiLink]]"]
-`````
-=======
-[REASON: 如果是 DISCARD，请用一句话简述具体原因，例如"缺少Mermaid图表"或"未包含[[WikiLink]]"]
-`````
->>>>>>> ea701b9bc2d4b20e096462ca1b69585cede2e05f
