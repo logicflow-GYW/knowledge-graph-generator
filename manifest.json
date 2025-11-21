@@ -3,8 +3,8 @@
     "name": "Knowledge Graph Generator",
     "version": "1.7.2",
     "minAppVersion": "0.15.0",
-    "description": "自动生成、审核和修正知识笔记，构建个人知识图谱。",
+    "description": "Automatically generate, review, and revise knowledge notes to build your personal knowledge graph.",
     "author": "logicflow-GYW",
-    "authorUrl": "",
+    "authorUrl": "https://github.com/logicflow-GYW",
     "isDesktopOnly": false
 }
