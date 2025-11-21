@@ -267,7 +267,7 @@ export class KGsSettingTab extends PluginSettingTab {
             .setName("Google Gemini model (primary)") 
             .setDesc("Primary model name.")
             .addText(text => text
-                .setPlaceholder("gemini-1.5-pro-latest")
+                .setPlaceholder("gemini-2.5-flash-lite")
                 .setValue(this.plugin.settings.google_model)
                 .onChange(async (value) => {
                     this.plugin.settings.google_model = value.trim();
@@ -302,7 +302,7 @@ export class KGsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("LLM parameters").setHeading();
         new Setting(containerEl)
             .setName("Generation temperature") 
-            .setDesc("0.0 to 2.0 (Creative vs deterministic).")
+            .setDesc("0.0 to 2.0 (creative vs deterministic).")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_temperature))
                 .onChange(async (value) => {
@@ -391,7 +391,7 @@ export class KGsSettingTab extends PluginSettingTab {
         
         new Setting(containerEl)
             .setName("Extract new concepts") 
-            .setDesc("Automatically add [[Wikilinks]] from approved notes to generation queue.")
+            .setDesc("Automatically add [[wikilinks]] from approved notes to generation queue.")
             .addToggle(toggle => toggle
                 .setValue(this.plugin.settings.extract_new_concepts)
                 .onChange(async (value) => {
