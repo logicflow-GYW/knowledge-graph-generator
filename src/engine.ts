@@ -72,7 +72,7 @@ export class Engine {
         if (this.isRunning) return;
         this.isRunning = true;
         this.plugin.data.status = "running";
-        // 修改：Sentence case
+        // 修改：Sentence case - Knowledge graph engine started!
         new Notice("Knowledge graph engine started!");
         this.updateStatusBar();
         
@@ -90,7 +90,7 @@ export class Engine {
             clearTimeout(this.timerId);
             this.timerId = null;
         }
-        // 修改：Sentence case
+        // 修改：Sentence case - Knowledge graph engine paused.
         new Notice("Knowledge graph engine paused.");
         this.updateStatusBar();
         void this.plugin.savePluginData(); 

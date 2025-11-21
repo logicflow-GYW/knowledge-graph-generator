@@ -307,7 +307,8 @@ export class KGsSettingTab extends PluginSettingTab {
         new Setting(containerEl).setName("LLM parameters").setHeading(); // Acronym OK
         new Setting(containerEl)
             .setName("Generation temperature") // Sentence case
-            .setDesc("0.0 to 2.0 (Creative vs Deterministic).")
+            // 修改：Deterministic -> deterministic
+            .setDesc("0.0 to 2.0 (Creative vs deterministic).")
             .addText(text => text
                 .setValue(String(this.plugin.settings.generation_temperature))
                 .onChange(async (value) => {
@@ -442,7 +443,8 @@ export class KGsSettingTab extends PluginSettingTab {
             .setName("Seed box") // Sentence case
             .setDesc("Enter concepts here, one per line.")
             .addTextArea(text => {
-                text.setPlaceholder("First Principles\nOccam's Razor\n...")
+                // 修改：First principles\nOccam's razor (Sentence case)
+                text.setPlaceholder("First principles\nOccam's razor\n...")
                     .setValue(this.plugin.settings.seedConcepts)
                     .onChange(async (value) => {
                         this.plugin.settings.seedConcepts = value;
