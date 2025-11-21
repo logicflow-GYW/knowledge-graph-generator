@@ -105,7 +105,7 @@ export class APIHandler {
         return data.candidates[0].content.parts[0].text.trim();
     }
 
-    // Fixed: replaced 'any' with 'unknown'
+    // Fixed: replaced 'any' with 'unknown' and strict type checking
     private _isQuotaError(error: unknown): boolean {
         const err = error as { status?: number; message?: string }; 
         const httpStatus = err.status;
@@ -148,7 +148,7 @@ export class APIHandler {
             const result = await this._makeOpenAIRequest(key, prompt, primaryModel);
             this._resetCooldown(key, "openai");
             return result;
-        } catch (e: unknown) { // Fixed: unknown
+        } catch (e: unknown) { 
             const primaryError = e;
             const primaryMsg = (e instanceof Error) ? e.message : String(e);
             
@@ -159,7 +159,7 @@ export class APIHandler {
                     const backupResult = await this._makeOpenAIRequest(key, prompt, backupModel);
                     this._resetCooldown(key, "openai");
                     return backupResult; 
-                } catch (e2: unknown) { // Fixed: unknown
+                } catch (e2: unknown) { 
                     const backupMsg = (e2 instanceof Error) ? e2.message : String(e2);
                     console.error(`OpenAI backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupMsg);
                     
@@ -185,7 +185,7 @@ export class APIHandler {
             const result = await this._makeGoogleAPIRequest(key, prompt, primaryModel);
             this._resetCooldown(key, "google");
             return result;
-        } catch (e: unknown) { // Fixed: unknown
+        } catch (e: unknown) { 
             const primaryError = e;
             const primaryMsg = (e instanceof Error) ? e.message : String(e);
             console.warn(`Google primary model '${primaryModel}' failed for key ...${key.slice(-4)}:`, primaryMsg);
@@ -195,7 +195,7 @@ export class APIHandler {
                     const backupResult = await this._makeGoogleAPIRequest(key, prompt, backupModel);
                     this._resetCooldown(key, "google");
                     return backupResult; 
-                } catch (e2: unknown) { // Fixed: unknown
+                } catch (e2: unknown) { 
                     const backupMsg = (e2 instanceof Error) ? e2.message : String(e2);
                     console.error(`Google backup model '${backupModel}' also failed for key ...${key.slice(-4)}:`, backupMsg);
                     
@@ -229,7 +229,7 @@ export class APIHandler {
                     try {
                         console.debug(`Trying OpenAI key ...${key.slice(-4)}`);
                         return await this._callOpenAI(key, prompt);
-                    } catch (e: unknown) { // Fixed: unknown
+                    } catch (e: unknown) { 
                         const err = e as Error;
                         lastError = err;
                         new Notice(`OpenAI key ...${key.slice(-4)} failed. Trying next.`);
@@ -253,7 +253,7 @@ export class APIHandler {
                     try {
                         console.debug(`Trying Google Gemini key ...${key.slice(-4)}`);
                         return await this._callGoogleAPI(key, prompt);
-                    } catch (e: unknown) { // Fixed: unknown
+                    } catch (e: unknown) { 
                         const err = e as Error;
                         lastError = err;
                         new Notice(`Google Gemini key ...${key.slice(-4)} failed. Trying next.`);

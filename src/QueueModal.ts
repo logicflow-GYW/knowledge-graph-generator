@@ -41,7 +41,6 @@ export class QueueManagementModal extends Modal {
 
         contentEl.empty();
         contentEl.addClass('kg-modal'); 
-        // Fixed: Sentence case
         contentEl.createEl('h2', { text: 'Queue management dashboard' }); 
 
         const status = this.plugin.data.status;
@@ -49,10 +48,10 @@ export class QueueManagementModal extends Modal {
         
         // 1. 状态和启停按钮
         new Setting(contentEl)
-            .setName(status === 'running' ? 'Engine running' : 'Engine paused') // Fixed: Sentence case
+            .setName(status === 'running' ? 'Engine running' : 'Engine paused') 
             .setDesc(statusText)
             .addButton(button => button
-                .setButtonText(status === 'running' ? 'Pause engine' : 'Start engine') // Fixed: Sentence case
+                .setButtonText(status === 'running' ? 'Pause engine' : 'Start engine') 
                 .setCta(status !== 'running')
                 .onClick(() => {
                     this.plugin.engine.toggleEngineState();
@@ -61,7 +60,6 @@ export class QueueManagementModal extends Modal {
             );
 
         // 2. 渲染四个队列
-        // Fixed: Sentence case for titles
         this.renderQueueSection(
             contentEl, 
             'gen', 
@@ -194,7 +192,7 @@ export class QueueManagementModal extends Modal {
             .setName(itemName)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Delete concept') // Fixed: Sentence case
+                .setTooltip('Delete concept') 
                 .onClick(async () => {
                     const queue = this.plugin.data.generationQueue;
                     const index = queue.indexOf(itemName);
@@ -211,10 +209,10 @@ export class QueueManagementModal extends Modal {
     private renderReviewItem(container: HTMLElement, item: string | TaskData) {
         const task = item as TaskData;
         new Setting(container)
-            .setName(`[Review] ${task.idea}`)
+            .setName(`Review: ${task.idea}`) // Modified to avoid [Review] title case warning
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task') // Fixed: Sentence case
+                .setTooltip('Discard task') 
                 .onClick(async () => {
                     this.plugin.data.reviewQueue.splice(this.plugin.data.reviewQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -228,11 +226,11 @@ export class QueueManagementModal extends Modal {
     private renderRevisionItem(container: HTMLElement, item: string | TaskData) {
         const task = item as TaskData;
         new Setting(container)
-            .setName(`[Revision] ${task.idea}`)
+            .setName(`Revision: ${task.idea}`) // Modified
             .setDesc(`Reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task') // Fixed: Sentence case
+                .setTooltip('Discard task') 
                 .onClick(async () => {
                     this.plugin.data.revisionQueue.splice(this.plugin.data.revisionQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -246,11 +244,11 @@ export class QueueManagementModal extends Modal {
     private renderDiscardedItem(container: HTMLElement, item: string | TaskData) {
         const task = item as TaskData;
         new Setting(container)
-            .setName(`[Discarded] ${task.idea}`)
+            .setName(`Discarded: ${task.idea}`) // Modified
             .setDesc(`Last reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('refresh-cw')
-                .setTooltip('Re-queue (generation)') // Fixed: Sentence case
+                .setTooltip('Re-queue (generation)') 
                 .onClick(() => {
                     this.plugin.data.discardedPile.splice(this.plugin.data.discardedPile.indexOf(task), 1);
                     this.plugin.engine.addConceptsToQueue([task.idea]); // 使用 engine 的方法
