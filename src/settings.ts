@@ -194,9 +194,6 @@ export class KGsSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
         
-        // 修复：移除了 "General" 标题
-        // 修复：UI Text 调整为 Sentence case
-
         // --- 队列管理 ---
         new Setting(containerEl)
             .setName("Engine dashboard") // Sentence case
@@ -403,7 +400,8 @@ export class KGsSettingTab extends PluginSettingTab {
             .setDesc("Heuristic (fast, formatting check) or AI (smart, content check).")
             .addDropdown(dropdown => dropdown
                 .addOption("heuristic", "Heuristic")
-                .addOption("ai", "Artificial Intelligence (AI)")
+                // 修改：Artificial intelligence (AI) - Sentence case
+                .addOption("ai", "Artificial intelligence (AI)")
                 .setValue(this.plugin.settings.critic_mode)
                 .onChange(async (value: 'heuristic' | 'ai') => {
                     this.plugin.settings.critic_mode = value;

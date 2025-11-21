@@ -60,7 +60,6 @@ export class Engine {
         }
 
         if (addedCount > 0) {
-            // 修复：显式标记 promise 为 void，解决 "Promises must be awaited" 错误
             void this.plugin.savePluginData(); 
             this.updateStatusBar();
         }
@@ -73,10 +72,10 @@ export class Engine {
         if (this.isRunning) return;
         this.isRunning = true;
         this.plugin.data.status = "running";
-        new Notice("Knowledge Graph Engine started!");
+        // 修改：Sentence case
+        new Notice("Knowledge graph engine started!");
         this.updateStatusBar();
         
-        // 显式处理 promise
         this.tick().catch(error => {
             console.error("Tick error during start:", error);
             this.stop();
@@ -91,9 +90,9 @@ export class Engine {
             clearTimeout(this.timerId);
             this.timerId = null;
         }
-        new Notice("Knowledge Graph Engine paused.");
+        // 修改：Sentence case
+        new Notice("Knowledge graph engine paused.");
         this.updateStatusBar();
-        // 修复：显式处理 Promise
         void this.plugin.savePluginData(); 
     }
 
