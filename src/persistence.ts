@@ -97,15 +97,17 @@ export class Persistence {
         return ""; // 如果丢失或读取失败，返回空
     }
 
+    // 【修改点】改为直接物理删除，防止隐藏目录下的权限问题导致文件堆积
     async deleteTaskContent(idea: string) {
         const path = this.getCachePath(idea);
         try {
             if (await this.app.vault.adapter.exists(path)) {
+                // 直接使用 remove 进行物理删除
                 await this.app.vault.adapter.remove(path);
-                Logger.log(`Deleted content cache for: ${idea}`);
+                Logger.log(`Deleted content cache: ${idea}`);
             }
         } catch (e) {
-            Logger.warn(`Failed to delete content cache for ${idea} (might allow cleanup later):`, e);
+            Logger.warn(`Failed to delete content cache for ${idea}:`, e);
         }
     }
 }

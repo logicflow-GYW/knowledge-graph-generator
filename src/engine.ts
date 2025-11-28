@@ -1,6 +1,8 @@
 // src/engine.ts
 
 import { Notice, TFile, TFolder, normalizePath, App } from "obsidian";
+// 【修正 1】使用默认导入，防止 named export 兼容性问题
+import Pinyin from 'tiny-pinyin'; 
 import KnowledgeGraphPlugin from "./main";
 import { APIHandler, AllModelsFailedError } from "./apiHandler";
 import { Critic } from "./critic";
@@ -17,9 +19,7 @@ export class Engine {
     private isRunning: boolean = false;
     private timerId: NodeJS.Timeout | null = null;
     
-    // 【修改】改为 Map，存储任务开始时间，用于超时检查 (看门狗)
     private activeGenerations: Map<string, number> = new Map();
-    // 5分钟超时阈值，防止任务永久卡死占用并发槽
     private readonly TASK_TIMEOUT_MS = 5 * 60 * 1000; 
 
     constructor(plugin: KnowledgeGraphPlugin) {
@@ -30,7 +30,6 @@ export class Engine {
         this.reviser = new Reviser(plugin);
     }
 
-    // --- Public Controls ---
     public toggleEngineState(): void {
         if (this.isRunning) {
             this.stop();
@@ -57,14 +56,14 @@ export class Engine {
 
     public addConceptsToQueue(concepts: string[]): number {
         const currentQueue = new Set(this.plugin.data.generationQueue);
-        const existingFiles = new Set(this.app.vault.getMarkdownFiles().map(f => f.basename));
-
+        
         let addedCount = 0;
         for (const concept of concepts) {
             const sanitized = sanitizeFilename(concept);
-            // 检查：不在队列中、文件不存在、且当前没有正在生成
+            const existingFile = this.app.metadataCache.getFirstLinkpathDest(sanitized, "");
+
             if (!currentQueue.has(concept) && 
-                !existingFiles.has(sanitized) && 
+                !existingFile && 
                 !this.activeGenerations.has(concept)) {
                 
                 this.plugin.data.generationQueue.push(concept);
@@ -79,8 +78,6 @@ export class Engine {
         }
         return addedCount;
     }
-
-    // --- Core Loop ---
     
     private start(): void {
         if (this.isRunning) return;
@@ -118,15 +115,12 @@ export class Engine {
         }, delay);
     }
 
-    // 【新增】僵尸任务清理器
     private cleanupZombieTasks() {
         const now = Date.now();
         for (const [idea, startTime] of this.activeGenerations.entries()) {
             if (now - startTime > this.TASK_TIMEOUT_MS) {
                 Logger.warn(`🧹 [Zombie Sweeper]: Removing stuck task '${idea}' after ${this.TASK_TIMEOUT_MS / 1000}s.`);
                 this.activeGenerations.delete(idea);
-                // 注意：这里可以选择将任务放回队列重试，或者直接丢弃。
-                // 为了防止死循环，这里选择不做操作（视为失败），用户可以在日志看到。
             }
         }
     }
@@ -135,9 +129,7 @@ export class Engine {
         if (!this.isRunning) return;
 
         try {
-            // 每次心跳先清理僵尸任务
             this.cleanupZombieTasks();
-
             let taskProcessed = false;
 
             if (this.plugin.data.revisionQueue.length > 0) {
@@ -147,7 +139,6 @@ export class Engine {
                 taskProcessed = await this.runCriticPhase();
             } 
             else if (this.plugin.data.generationQueue.length > 0) {
-                // Generation 阶段现在是非阻塞的滑动窗口
                 taskProcessed = await this.runGenerationPhase();
             }
 
@@ -156,7 +147,6 @@ export class Engine {
                 this.plugin.data.reviewQueue.length === 0 &&
                 this.plugin.data.revisionQueue.length === 0) {
                 
-                // 只有当没有任何 active 任务时才完全停止
                 if (this.activeGenerations.size === 0) {
                     new Notice("🎉 All tasks completed! Engine stopped.");
                     this.isRunning = false;
@@ -169,6 +159,8 @@ export class Engine {
 
         } catch (error) {
             Logger.error("Engine fatal error:", error);
+            // 打印完整的错误堆栈，方便调试
+            console.error(error); 
             new Notice("Engine encountered an error and paused. Check console.");
             this.stop(); 
             return;
@@ -176,10 +168,7 @@ export class Engine {
 
         this.scheduleNextTick();
     }
-
-    // --- Phases ---
     
-    // 【重构】滑动窗口模式
     private async runGenerationPhase(): Promise<boolean> {
         const queue = this.plugin.data.generationQueue;
         if (queue.length === 0) return false;
@@ -188,33 +177,24 @@ export class Engine {
         const currentActive = this.activeGenerations.size;
         const slotsAvailable = maxConcurrency - currentActive;
 
-        // 如果没有空槽位，直接跳过，等待下一轮 tick
         if (slotsAvailable <= 0) return false;
 
-        // 筛选出不在运行中的任务
         const candidates = queue.filter(idea => !this.activeGenerations.has(idea));
         if (candidates.length === 0) return false;
 
-        // 取出填满槽位所需的任务数
         const batch = candidates.slice(0, slotsAvailable);
-
-        // 立即锁定这些任务
         batch.forEach(idea => this.activeGenerations.set(idea, Date.now()));
         
         this.updateStatusBar();
         await this.plugin.savePluginData();
 
-        // 【关键】触发后台执行，不使用 await 阻塞 tick
-        // 我们不需要 Promise.allSettled，因为每个任务会在完成后自己清理状态
         batch.forEach(idea => {
             this.generationTask(idea).catch(err => {
                 Logger.error(`Unhandled error in background generation task for ${idea}:`, err);
-                // 确保异常情况下锁也能解开（双重保险，已有 finally）
                 this.activeGenerations.delete(idea);
             });
         });
 
-        // 只要触发了任务，就返回 true，表示引擎在工作
         return true;
     }
 
@@ -224,13 +204,9 @@ export class Engine {
             const content = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(content);
             
-            // 保存内容到缓存文件
             await this.plugin.persistence.saveTaskContent(idea, cleanedContent);
-            
-            // 队列中只保存元数据
             this.plugin.data.reviewQueue.push({ idea, content: cleanedContent });
             
-            // 成功后，从 generationQueue 中移除
             const qIndex = this.plugin.data.generationQueue.indexOf(idea);
             if (qIndex > -1) {
                 this.plugin.data.generationQueue.splice(qIndex, 1);
@@ -244,12 +220,9 @@ export class Engine {
                 this.stop();
             } else {
                 Logger.error(`⚠️ [Generation Error]: ${idea} - ${e}`);
-                // 普通错误（如超时），任务保留在队列，锁释放后下一轮会重试
             }
         } finally {
-            // 【关键】任务结束（无论成功失败），释放并发槽位
             this.activeGenerations.delete(idea);
-            // 触发一次保存，确保队列变更持久化
             void this.plugin.savePluginData();
             this.updateStatusBar();
         }
@@ -281,6 +254,7 @@ export class Engine {
 
             const { isApproved, reason } = await this.critic.judge(content);
             if (isApproved) {
+                // 【保存文件时可能会出错，所以这里是重点】
                 await this.saveNote(task.idea, content);
                 await this.plugin.persistence.deleteTaskContent(task.idea);
                 
@@ -363,8 +337,6 @@ export class Engine {
         }
     }
 
-    // --- File & UI ---
-    
     private async ensureFolderExists(folderPath: string): Promise<void> {
         const normalizedPath = normalizePath(folderPath);
         const folders = normalizedPath.split("/");
@@ -388,7 +360,38 @@ export class Engine {
 
     private async saveNote(idea: string, content: string): Promise<void> {
         const filename = sanitizeFilename(idea);
-        const folderPath = this.plugin.settings.output_dir;
+        const baseDir = this.plugin.settings.output_dir;
+        
+        // 【修正】使用 tiny-pinyin 的正确姿势
+        let subFolder = "0-9_Others";
+        const cleanName = filename.replace(/[\[\]]/g, '').trim();
+        const firstChar = cleanName.charAt(0);
+
+        // 1. 英文
+        if (/^[a-zA-Z]/.test(firstChar)) {
+            subFolder = firstChar.toUpperCase();
+        } 
+        // 2. 中文 (修正后的逻辑)
+        else if (Pinyin.isSupported(firstChar)) {
+            try {
+                // Pinyin.parse 返回数组，如 [{source: '中', type: 2, target: 'ZHONG'}]
+                const tokens = Pinyin.parse(firstChar);
+                if (tokens && tokens.length > 0 && tokens[0].target) {
+                    const pinyinStr = tokens[0].target; // 例如 "ZHONG"
+                    const pinyinLetter = pinyinStr.charAt(0).toUpperCase(); // 取 "Z"
+                    
+                    if (/^[A-Z]/.test(pinyinLetter)) {
+                        subFolder = pinyinLetter;
+                    }
+                }
+            } catch (err) {
+                Logger.warn(`Pinyin parse error for ${firstChar}:`, err);
+                // 出错则降级到 "CN_Chinese" 或 "Others"
+                subFolder = "CN_Chinese";
+            }
+        }
+        
+        const folderPath = `${baseDir}/${subFolder}`;
 
         try {
             await this.ensureFolderExists(folderPath);
