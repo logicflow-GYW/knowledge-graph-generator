@@ -167,16 +167,25 @@ export class Engine {
             const content = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(content);
             
-            // 【修改】保存内容到缓存文件，而不是仅保留在内存
+            // 保存内容到缓存文件
             await this.plugin.persistence.saveTaskContent(idea, cleanedContent);
             
-            // 队列中只保存元数据，content 可选
+            // 队列中只保存元数据
             this.plugin.data.reviewQueue.push({ idea, content: cleanedContent });
             Logger.log(`✅ [Generation Success]: ${idea}`);
         } catch (e) {
             if (e instanceof AllModelsFailedError) {
                 Logger.error(`❌ [Generation Failed]: ${idea} - ${e.message}`);
+                // 放回队列头部
                 this.plugin.data.generationQueue.unshift(idea); 
+                
+                // 【修复】致命错误自动暂停，防止死循环空转
+                new Notice(`🛑 Engine paused: All models failed for '${idea}'. Check settings.`);
+                this.stop();
+            } else {
+                // 其他未知错误，暂时放回队列，但不停止引擎（可能是临时网络波动）
+                 Logger.error(`⚠️ [Generation Error]: ${idea} - ${e}`);
+                 this.plugin.data.generationQueue.unshift(idea);
             }
         }
     }
@@ -194,7 +203,6 @@ export class Engine {
         let newIdeasFound: Set<string> = new Set();
 
         for (const task of tasksToReview) {
-            // 【修改】如果内存中没有内容（刚加载），从文件加载
             let content = task.content;
             if (!content) {
                 content = await this.plugin.persistence.loadTaskContent(task.idea);
@@ -209,7 +217,7 @@ export class Engine {
             const { isApproved, reason } = await this.critic.judge(content);
             if (isApproved) {
                 await this.saveNote(task.idea, content);
-                // 【修改】批准后，清理缓存文件
+                // 批准后，清理缓存文件
                 await this.plugin.persistence.deleteTaskContent(task.idea);
                 
                 if (this.plugin.settings.extract_new_concepts) {
@@ -248,8 +256,8 @@ export class Engine {
         for (const task of tasksToRevise) {
             if ((task.retries || 0) >= this.plugin.settings.max_revision_retries) {
                 this.plugin.data.discardedPile.push(task); 
-                // 【修改】彻底丢弃时，是否删除缓存？目前保留以便手动重试，或者您可以选择删除
-                // await this.plugin.persistence.deleteTaskContent(task.idea); 
+                // 达到最大重试次数，移入废弃堆。
+                // 暂时不删除缓存，允许用户在废弃堆手动 "永久删除" 或 "重新排队"。
                 Logger.error(`💀 [Give up]: ${task.idea} max retries reached.`);
                 continue; 
             }
@@ -261,7 +269,6 @@ export class Engine {
     }
 
     private async revisionTask(task: TaskData): Promise<void> {
-        // 【修改】确保有内容
         let content = task.content;
         if (!content) {
             content = await this.plugin.persistence.loadTaskContent(task.idea);
@@ -277,32 +284,64 @@ export class Engine {
             const newContent = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(newContent);
             
-            // 【修改】更新缓存文件
+            // 更新缓存文件
             await this.plugin.persistence.saveTaskContent(task.idea, cleanedContent);
 
             const revisedTask: TaskData = { ...task, content: cleanedContent };
             this.plugin.data.reviewQueue.push(revisedTask); 
             Logger.log(`🔄 [Revision Complete]: ${task.idea}`);
-        } catch (e: unknown) { // Fixed: unknown
+        } catch (e: unknown) { 
             const errMsg = e instanceof Error ? e.message : String(e);
             Logger.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
+            
+            // Revision 失败不建议立刻 Stop，可能是临时网络问题，放回 Revision 队列重试
+            // 但如果一直失败，会达到 retries 上限被丢弃
             this.plugin.data.revisionQueue.unshift(task); 
+
+            if (e instanceof AllModelsFailedError) {
+                new Notice("🛑 Engine paused: All models failed during revision.");
+                this.stop();
+            }
         }
     }
 
     // --- File & UI ---
+    
+    // 【新增】辅助方法：递归确保文件夹存在
+    private async ensureFolderExists(folderPath: string): Promise<void> {
+        const normalizedPath = normalizePath(folderPath);
+        const folders = normalizedPath.split("/");
+        let currentPath = "";
+
+        for (const folder of folders) {
+            currentPath = currentPath === "" ? folder : `${currentPath}/${folder}`;
+            const existing = this.app.vault.getAbstractFileByPath(currentPath);
+            if (!existing) {
+                try {
+                    await this.app.vault.createFolder(currentPath);
+                } catch (error) {
+                    // 忽略并发创建时的错误
+                    Logger.warn(`Folder check/create: ${currentPath}`, error);
+                }
+            } else if (!(existing instanceof TFolder)) {
+                // 如果路径存在但不是文件夹（比如同名文件），这会是个问题
+                Logger.error(`Path conflict: ${currentPath} exists but is not a folder.`);
+                throw new Error(`Cannot create folder "${currentPath}" because a file exists with the same name.`);
+            }
+        }
+    }
+
     private async saveNote(idea: string, content: string): Promise<void> {
         const filename = sanitizeFilename(idea);
         const folderPath = this.plugin.settings.output_dir;
 
-        if (!(this.app.vault.getAbstractFileByPath(folderPath) instanceof TFolder)) {
-            try {
-                await this.app.vault.createFolder(folderPath);
-            } catch (error) {
-                Logger.error(`Create folder failed: ${folderPath}`, error);
-                new Notice(`Cannot create folder: ${folderPath}`);
-                return; 
-            }
+        try {
+            // 【修复】使用递归创建方法
+            await this.ensureFolderExists(folderPath);
+        } catch (error) {
+            Logger.error(`Create folder failed: ${folderPath}`, error);
+            new Notice(`Cannot create folder: ${folderPath}`);
+            return; 
         }
         
         const filePath = normalizePath(`${folderPath}/${filename}.md`);

@@ -29,14 +29,12 @@ export class QueueManagementModal extends Modal {
     constructor(app: App, plugin: KnowledgeGraphPlugin) {
         super(app);
         this.plugin = plugin;
-        // 创建一个绑定的函数引用，用于刷新
         this.refreshContent = this.onOpen.bind(this);
     }
 
     onOpen() {
         const { contentEl } = this;
 
-        // 为了安全，先注销旧的监听器
         this.app.workspace.off("kg-data-updated", this.refreshContent);
 
         contentEl.empty();
@@ -55,7 +53,7 @@ export class QueueManagementModal extends Modal {
                 .setCta(status !== 'running')
                 .onClick(() => {
                     this.plugin.engine.toggleEngineState();
-                    this.onOpen(); // 刷新 Modal 内部
+                    this.onOpen(); 
                 })
             );
 
@@ -92,15 +90,12 @@ export class QueueManagementModal extends Modal {
             this.renderDiscardedItem.bind(this)
         );
 
-        // 在 onOpen 的末尾, 注册新的监听器
         this.app.workspace.on("kg-data-updated", this.refreshContent);
     }
 
     onClose() {
         const { contentEl } = this;
         contentEl.empty();
-        
-        // 在 Modal 关闭时, 必须注销监听器
         this.app.workspace.off("kg-data-updated", this.refreshContent);
     }
 
@@ -114,7 +109,7 @@ export class QueueManagementModal extends Modal {
         data: (string | TaskData)[],
         renderFn: (container: HTMLElement, item: string | TaskData, index: number) => void
     ) {
-        const displayLimit = 100; // 每次最多渲染 100 项
+        const displayLimit = 100; 
         const filter = this.searchTerms[key];
         
         // 1. 执行过滤
@@ -133,9 +128,9 @@ export class QueueManagementModal extends Modal {
 
         // 2. 使用 <details> 元素创建可折叠区域
         const details = containerEl.createEl('details');
-        details.open = this.collapseStates[key]; // 设置初始展开/折叠状态
+        details.open = this.collapseStates[key]; 
 
-        // 3. 标题 (使用 CSS 类)
+        // 3. 标题
         const summary = details.createEl('summary', { text: titleText });
         summary.addClass('kg-modal-summary');
 
@@ -144,7 +139,7 @@ export class QueueManagementModal extends Modal {
             this.collapseStates[key] = details.open;
         });
 
-        // 5. 搜索框 (放在 details 内部)
+        // 5. 搜索框
         new Setting(details)
             .setDesc(`Search ${title.toLowerCase()}...`) 
             .addText(text => {
@@ -152,7 +147,7 @@ export class QueueManagementModal extends Modal {
                     .setValue(this.searchTerms[key])
                     .onChange(value => {
                         this.searchTerms[key] = value;
-                        this.onOpen(); // 刷新 Modal
+                        this.onOpen(); 
                     });
             });
 
@@ -165,7 +160,7 @@ export class QueueManagementModal extends Modal {
             return;
         }
         
-        // 7. 列表容器 (放在 details 内部，使用 CSS 类)
+        // 7. 列表容器
         const listContainer = details.createDiv('kg-list-container');
 
         truncatedData.forEach((item, index) => {
@@ -185,7 +180,6 @@ export class QueueManagementModal extends Modal {
     // --- 单项渲染函数 ---
 
     private renderGenerationItem(container: HTMLElement, item: string | TaskData) {
-        // item 在 generation queue 中通常是 string
         const itemName = typeof item === 'string' ? item : item.idea;
         
         new Setting(container)
@@ -200,7 +194,7 @@ export class QueueManagementModal extends Modal {
                         queue.splice(index, 1);
                         await this.plugin.savePluginData();
                         this.plugin.engine.updateStatusBar();
-                        this.onOpen(); // 刷新
+                        this.onOpen(); 
                     }
                 }) 
             );
@@ -209,10 +203,10 @@ export class QueueManagementModal extends Modal {
     private renderReviewItem(container: HTMLElement, item: string | TaskData) {
         const task = item as TaskData;
         new Setting(container)
-            .setName(`Review: ${task.idea}`) // Modified to avoid [Review] title case warning
+            .setName(`Review: ${task.idea}`) 
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task') 
+                .setTooltip('Move to discarded') // 修改提示：只是移动，不删文件
                 .onClick(async () => {
                     this.plugin.data.reviewQueue.splice(this.plugin.data.reviewQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -226,11 +220,11 @@ export class QueueManagementModal extends Modal {
     private renderRevisionItem(container: HTMLElement, item: string | TaskData) {
         const task = item as TaskData;
         new Setting(container)
-            .setName(`Revision: ${task.idea}`) // Modified
+            .setName(`Revision: ${task.idea}`) 
             .setDesc(`Reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('trash')
-                .setTooltip('Discard task') 
+                .setTooltip('Move to discarded') // 修改提示
                 .onClick(async () => {
                     this.plugin.data.revisionQueue.splice(this.plugin.data.revisionQueue.indexOf(task), 1);
                     this.plugin.data.discardedPile.push(task);
@@ -244,15 +238,36 @@ export class QueueManagementModal extends Modal {
     private renderDiscardedItem(container: HTMLElement, item: string | TaskData) {
         const task = item as TaskData;
         new Setting(container)
-            .setName(`Discarded: ${task.idea}`) // Modified
+            .setName(`Discarded: ${task.idea}`)
             .setDesc(`Last reason: ${task.reason || 'Unknown'}`)
             .addButton(btn => btn
                 .setIcon('refresh-cw')
                 .setTooltip('Re-queue (generation)') 
-                .onClick(() => {
+                .onClick(async () => {
+                    // 重新排队时，可以选择是否保留旧内容。这里逻辑保持不变，重新排入 Generation 队列会重新生成。
+                    // 建议：如果要彻底重新生成，最好把旧缓存删了，防止 Revision 阶段读取旧的坏文件。
+                    await this.plugin.persistence.deleteTaskContent(task.idea);
+
                     this.plugin.data.discardedPile.splice(this.plugin.data.discardedPile.indexOf(task), 1);
-                    this.plugin.engine.addConceptsToQueue([task.idea]); // 使用 engine 的方法
+                    this.plugin.engine.addConceptsToQueue([task.idea]); 
                     this.onOpen();
+                })
+            )
+            // 【新增】彻底删除按钮
+            .addButton(btn => btn
+                .setIcon('cross') // 使用 cross 或 trash-2
+                .setTooltip('Delete Permanently (Clear Cache)')
+                .setClass('mod-warning') // 设置为警告色（红色）
+                .onClick(async () => {
+                    const index = this.plugin.data.discardedPile.indexOf(task);
+                    if (index > -1) {
+                        this.plugin.data.discardedPile.splice(index, 1);
+                        // 关键：彻底删除缓存文件
+                        await this.plugin.persistence.deleteTaskContent(task.idea);
+                        await this.plugin.savePluginData();
+                        this.plugin.engine.updateStatusBar();
+                        this.onOpen();
+                    }
                 })
             );
     }
