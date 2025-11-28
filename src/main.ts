@@ -1,6 +1,6 @@
 // src/main.ts
 
-import { Plugin } from 'obsidian';
+import { Plugin, debounce } from 'obsidian'; // 【改动1】引入 debounce
 import { KnowledgeGraphPluginSettings, PluginData } from './types';
 import { KGsSettingTab, DEFAULT_SETTINGS, getDefaultPrompts } from './settings';
 import { Engine } from './engine';
@@ -33,6 +33,12 @@ export default class KnowledgeGraphPlugin extends Plugin {
 
         // 3. 加载队列数据 (queues.json)
         await this.loadPluginData();
+        
+        // 【改动2】给 savePluginData 加上防抖 (Debounce)
+        // 2000ms 内的多次调用会被合并为一次，true 表示由计时器触发。
+        // 这解决了 Android 端高频写入导致的文件锁崩溃问题 (win.androidBridge.onmessage Error)，
+        // 同时不会影响并发任务在内存中的正常运行。
+        this.savePluginData = debounce(this.savePluginData.bind(this), 2000, true);
         
         this.engine = new Engine(this);
 
@@ -94,7 +100,13 @@ export default class KnowledgeGraphPlugin extends Plugin {
     }
 
     async savePluginData() {
-        // 保存队列到 queues.json
-        await this.persistence.saveQueueData(this.data);
+        // 【改动3】增加 try-catch 保护
+        // 防止后台写入出错时抛出 Uncaught Error 导致插件崩溃
+        try {
+            // 保存队列到 queues.json
+            await this.persistence.saveQueueData(this.data);
+        } catch (error) {
+            Logger.error("Failed to save queue data (debounced):", error);
+        }
     }
 }
