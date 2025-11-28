@@ -1,19 +1,28 @@
 {
-    "name": "obsidian-knowledge-graph",
-    "version": "1.0.0",
-    "description": "An Obsidian plugin to automatically generate knowledge notes.",
-    "main": "main.js",
-    "scripts": {
-        "build": "node esbuild.config.mjs"
-    },
-    "keywords": [],
-    "author": "Your Name",
-    "license": "MIT",
-    "devDependencies": {
-        "@types/node": "^16.11.6",
-        "esbuild": "0.17.3",
-        "obsidian": "latest",
-        "tslib": "2.4.0",
-        "typescript": "4.7.4"
-    }
+  "name": "obsidian-knowledge-graph",
+  "version": "1.8.0",
+  "description": "An Obsidian plugin to automatically generate knowledge notes with high-performance indexing and A-Z archiving.",
+  "main": "main.js",
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch"
+  },
+  "keywords": [
+    "obsidian",
+    "knowledge-graph",
+    "ai",
+    "pinyin"
+  ],
+  "author": "logicflow-GYW",
+  "license": "MIT",
+  "dependencies": {
+    "tiny-pinyin": "^1.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "16.11.6",
+    "esbuild": "0.17.3",
+    "obsidian": "1.7.2",
+    "tslib": "2.4.0",
+    "typescript": "4.7.4"
+  }
 }

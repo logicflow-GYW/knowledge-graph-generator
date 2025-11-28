@@ -1,9 +1,9 @@
 {
     "id": "knowledge-graph-generator",
     "name": "Knowledge Graph Generator",
-    "version": "1.7.2",
+    "version": "1.8.0",
     "minAppVersion": "0.15.0",
-    "description": "Automatically generate, review, and revise knowledge notes to build your personal knowledge graph.",
+    "description": "High-performance AI knowledge generator. Features: O(1) deduplication, A-Z/Pinyin auto-archiving for massive vaults.",
     "author": "logicflow-GYW",
     "authorUrl": "https://github.com/logicflow-GYW",
     "isDesktopOnly": false
