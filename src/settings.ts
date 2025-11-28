@@ -133,6 +133,9 @@ export const DEFAULT_SETTINGS: KnowledgeGraphPluginSettings = {
     google_backup_model: "",
     failover_cooldown_seconds: 300,
     
+    // API 策略
+    api_key_strategy: "exhaustion",
+    
     // 参数
     generation_temperature: 0.7,
     generation_max_tokens: 4096,
@@ -204,6 +207,19 @@ export class KGsSettingTab extends PluginSettingTab {
         // --- API 设置 ---
         new Setting(containerEl).setName("API").setHeading();
 
+        // 【新增】策略选择设置
+        new Setting(containerEl)
+            .setName("API Key strategy")
+            .setDesc("Select how the plugin cycles through your API keys.")
+            .addDropdown(dropdown => dropdown
+                .addOption("exhaustion", "Sequential (Exhaust one, then next)")
+                .addOption("round-robin", "Round-Robin (Rotate after every request)")
+                .setValue(this.plugin.settings.api_key_strategy)
+                .onChange(async (value: 'exhaustion' | 'round-robin') => {
+                    this.plugin.settings.api_key_strategy = value;
+                    await this.plugin.saveSettings();
+                }));
+
         new Setting(containerEl).setName("OpenAI").setHeading();
         
         new Setting(containerEl)
@@ -267,7 +283,7 @@ export class KGsSettingTab extends PluginSettingTab {
             .setName("Google Gemini model (primary)") 
             .setDesc("Primary model name.")
             .addText(text => text
-                .setPlaceholder("gemini-2.5-flash-lite")
+                .setPlaceholder("gemini-1.5-pro")
                 .setValue(this.plugin.settings.google_model)
                 .onChange(async (value) => {
                     this.plugin.settings.google_model = value.trim();

@@ -10,6 +10,11 @@ export interface KnowledgeGraphPluginSettings {
     google_model: string;
     google_backup_model: string;
     failover_cooldown_seconds: number;
+    
+    // API 策略配置 (新增)
+    // 'exhaustion': 顺序耗尽模式 (默认) - 用完一个再换下一个
+    // 'round-robin': 轮询模式 - 每次请求轮流使用不同的 Key
+    api_key_strategy: 'exhaustion' | 'round-robin';
 
     // 参数配置
     generation_temperature: number;
@@ -22,7 +27,7 @@ export interface KnowledgeGraphPluginSettings {
     generation_batch_size: number;
     request_delay: number;
     
-    // 开发配置 (新增)
+    // 开发配置
     debug_mode: boolean;
 
     // Critic 配置
@@ -47,7 +52,7 @@ export interface KnowledgeGraphPluginSettings {
 
 export interface TaskData {
     idea: string;
-    content?: string; // 修改：变为可选，持久化时不存入 JSON，而是存入文件
+    content?: string; // 可选，持久化时不存入 JSON，而是存入文件
     reason?: string;
     retries?: number;
 }

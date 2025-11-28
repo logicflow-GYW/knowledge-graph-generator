@@ -1,6 +1,6 @@
 // src/apiHandler.ts
 
-import { requestUrl, Notice } from 'obsidian';
+import { requestUrl, Notice, RequestUrlParam } from 'obsidian';
 import KnowledgeGraphPlugin from './main';
 import { KnowledgeGraphPluginSettings, KeyUsageStatus } from './types';
 
@@ -27,8 +27,14 @@ export class APIHandler {
     
     private keyUsageOpenAI = new Map<string, KeyUsageStatus>();
     private keyUsageGoogle = new Map<string, KeyUsageStatus>();
+
+    private openAIKeyIndex: number = 0;
+    private googleKeyIndex: number = 0;
     
     private hasNotifiedFailover: boolean = false;
+
+    // 【新增】默认超时时间：90秒
+    private readonly REQUEST_TIMEOUT_MS = 90000;
 
     constructor(plugin: KnowledgeGraphPlugin) {
         this.plugin = plugin;
@@ -55,18 +61,59 @@ export class APIHandler {
     private _selectKey(keys: string[], provider: 'openai' | 'google'): string | null {
         const keyUsageMap = provider === "openai" ? this.keyUsageOpenAI : this.keyUsageGoogle;
         const currentTime = Date.now() / 1000;
+        const totalKeys = keys.length;
 
-        for (const key of keys) {
+        if (totalKeys === 0) return null;
+
+        const strategy = this.settings.api_key_strategy;
+        let startIndex = 0;
+        if (strategy === 'round-robin') {
+            startIndex = provider === "openai" ? this.openAIKeyIndex : this.googleKeyIndex;
+            startIndex = startIndex % totalKeys;
+        }
+
+        for (let i = 0; i < totalKeys; i++) {
+            const currentIndex = (startIndex + i) % totalKeys;
+            const key = keys[currentIndex];
             const usage = keyUsageMap.get(key);
+
             if (usage && currentTime >= usage.cooldown_until) {
+                if (strategy === 'round-robin') {
+                    const nextIndex = (currentIndex + 1) % totalKeys;
+                    if (provider === "openai") {
+                        this.openAIKeyIndex = nextIndex;
+                    } else {
+                        this.googleKeyIndex = nextIndex;
+                    }
+                }
                 return key;
             }
         }
         return null;
     }
 
+    // 【新增】超时包装器
+    private async _requestWithTimeout(requestParams: RequestUrlParam): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                reject(new Error(`API Request timed out after ${this.REQUEST_TIMEOUT_MS / 1000}s`));
+            }, this.REQUEST_TIMEOUT_MS);
+
+            requestUrl(requestParams)
+                .then(response => {
+                    clearTimeout(timer);
+                    resolve(response);
+                })
+                .catch(err => {
+                    clearTimeout(timer);
+                    reject(err);
+                });
+        });
+    }
+
     private async _makeOpenAIRequest(key: string, prompt: string, modelName: string): Promise<string> {
-        const response = await requestUrl({
+        // 使用带超时的请求
+        const response = await this._requestWithTimeout({
             url: `${this.settings.openai_base_url}/chat/completions`,
             method: "POST",
             headers: {
@@ -85,7 +132,8 @@ export class APIHandler {
 
     private async _makeGoogleAPIRequest(key: string, prompt: string, modelName: string): Promise<string> {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
-        const response = await requestUrl({
+        // 使用带超时的请求
+        const response = await this._requestWithTimeout({
             url,
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -105,7 +153,6 @@ export class APIHandler {
         return data.candidates[0].content.parts[0].text.trim();
     }
 
-    // Fixed: replaced 'any' with 'unknown' and strict type checking
     private _isQuotaError(error: unknown): boolean {
         const err = error as { status?: number; message?: string }; 
         const httpStatus = err.status;

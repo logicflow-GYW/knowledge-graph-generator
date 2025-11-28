@@ -16,6 +16,11 @@ export class Engine {
     reviser: Reviser;
     private isRunning: boolean = false;
     private timerId: NodeJS.Timeout | null = null;
+    
+    // 【修改】改为 Map，存储任务开始时间，用于超时检查 (看门狗)
+    private activeGenerations: Map<string, number> = new Map();
+    // 5分钟超时阈值，防止任务永久卡死占用并发槽
+    private readonly TASK_TIMEOUT_MS = 5 * 60 * 1000; 
 
     constructor(plugin: KnowledgeGraphPlugin) {
         this.plugin = plugin;
@@ -41,6 +46,11 @@ export class Engine {
             this.updateStatusBar();
             return true;
         }
+        
+        if (this.activeGenerations.has(concept)) {
+             new Notice(`'${concept}' is currently being generated.`);
+             return false;
+        }
         new Notice(`'${concept}' already exists or queued.`);
         return false;
     }
@@ -52,7 +62,11 @@ export class Engine {
         let addedCount = 0;
         for (const concept of concepts) {
             const sanitized = sanitizeFilename(concept);
-            if (!currentQueue.has(concept) && !existingFiles.has(sanitized)) {
+            // 检查：不在队列中、文件不存在、且当前没有正在生成
+            if (!currentQueue.has(concept) && 
+                !existingFiles.has(sanitized) && 
+                !this.activeGenerations.has(concept)) {
+                
                 this.plugin.data.generationQueue.push(concept);
                 currentQueue.add(concept); 
                 addedCount++;
@@ -104,10 +118,26 @@ export class Engine {
         }, delay);
     }
 
+    // 【新增】僵尸任务清理器
+    private cleanupZombieTasks() {
+        const now = Date.now();
+        for (const [idea, startTime] of this.activeGenerations.entries()) {
+            if (now - startTime > this.TASK_TIMEOUT_MS) {
+                Logger.warn(`🧹 [Zombie Sweeper]: Removing stuck task '${idea}' after ${this.TASK_TIMEOUT_MS / 1000}s.`);
+                this.activeGenerations.delete(idea);
+                // 注意：这里可以选择将任务放回队列重试，或者直接丢弃。
+                // 为了防止死循环，这里选择不做操作（视为失败），用户可以在日志看到。
+            }
+        }
+    }
+
     private async tick(): Promise<void> {
         if (!this.isRunning) return;
 
         try {
+            // 每次心跳先清理僵尸任务
+            this.cleanupZombieTasks();
+
             let taskProcessed = false;
 
             if (this.plugin.data.revisionQueue.length > 0) {
@@ -117,6 +147,7 @@ export class Engine {
                 taskProcessed = await this.runCriticPhase();
             } 
             else if (this.plugin.data.generationQueue.length > 0) {
+                // Generation 阶段现在是非阻塞的滑动窗口
                 taskProcessed = await this.runGenerationPhase();
             }
 
@@ -125,12 +156,15 @@ export class Engine {
                 this.plugin.data.reviewQueue.length === 0 &&
                 this.plugin.data.revisionQueue.length === 0) {
                 
-                new Notice("🎉 All tasks completed! Engine stopped.");
-                this.isRunning = false;
-                this.plugin.data.status = "idle"; 
-                this.updateStatusBar();
-                await this.plugin.savePluginData(); 
-                return; 
+                // 只有当没有任何 active 任务时才完全停止
+                if (this.activeGenerations.size === 0) {
+                    new Notice("🎉 All tasks completed! Engine stopped.");
+                    this.isRunning = false;
+                    this.plugin.data.status = "idle"; 
+                    this.updateStatusBar();
+                    await this.plugin.savePluginData(); 
+                    return; 
+                }
             }
 
         } catch (error) {
@@ -144,20 +178,43 @@ export class Engine {
     }
 
     // --- Phases ---
+    
+    // 【重构】滑动窗口模式
     private async runGenerationPhase(): Promise<boolean> {
         const queue = this.plugin.data.generationQueue;
         if (queue.length === 0) return false;
 
-        const batchSize = this.plugin.settings.generation_batch_size;
-        const batch = queue.splice(0, Math.min(queue.length, batchSize));
+        const maxConcurrency = this.plugin.settings.generation_batch_size;
+        const currentActive = this.activeGenerations.size;
+        const slotsAvailable = maxConcurrency - currentActive;
 
+        // 如果没有空槽位，直接跳过，等待下一轮 tick
+        if (slotsAvailable <= 0) return false;
+
+        // 筛选出不在运行中的任务
+        const candidates = queue.filter(idea => !this.activeGenerations.has(idea));
+        if (candidates.length === 0) return false;
+
+        // 取出填满槽位所需的任务数
+        const batch = candidates.slice(0, slotsAvailable);
+
+        // 立即锁定这些任务
+        batch.forEach(idea => this.activeGenerations.set(idea, Date.now()));
+        
         this.updateStatusBar();
-        await this.plugin.savePluginData(); 
+        await this.plugin.savePluginData();
 
-        const tasks = batch.map(idea => this.generationTask(idea));
-        await Promise.allSettled(tasks);
+        // 【关键】触发后台执行，不使用 await 阻塞 tick
+        // 我们不需要 Promise.allSettled，因为每个任务会在完成后自己清理状态
+        batch.forEach(idea => {
+            this.generationTask(idea).catch(err => {
+                Logger.error(`Unhandled error in background generation task for ${idea}:`, err);
+                // 确保异常情况下锁也能解开（双重保险，已有 finally）
+                this.activeGenerations.delete(idea);
+            });
+        });
 
-        await this.plugin.savePluginData(); 
+        // 只要触发了任务，就返回 true，表示引擎在工作
         return true;
     }
 
@@ -172,21 +229,29 @@ export class Engine {
             
             // 队列中只保存元数据
             this.plugin.data.reviewQueue.push({ idea, content: cleanedContent });
+            
+            // 成功后，从 generationQueue 中移除
+            const qIndex = this.plugin.data.generationQueue.indexOf(idea);
+            if (qIndex > -1) {
+                this.plugin.data.generationQueue.splice(qIndex, 1);
+            }
+
             Logger.log(`✅ [Generation Success]: ${idea}`);
         } catch (e) {
             if (e instanceof AllModelsFailedError) {
                 Logger.error(`❌ [Generation Failed]: ${idea} - ${e.message}`);
-                // 放回队列头部
-                this.plugin.data.generationQueue.unshift(idea); 
-                
-                // 【修复】致命错误自动暂停，防止死循环空转
                 new Notice(`🛑 Engine paused: All models failed for '${idea}'. Check settings.`);
                 this.stop();
             } else {
-                // 其他未知错误，暂时放回队列，但不停止引擎（可能是临时网络波动）
-                 Logger.error(`⚠️ [Generation Error]: ${idea} - ${e}`);
-                 this.plugin.data.generationQueue.unshift(idea);
+                Logger.error(`⚠️ [Generation Error]: ${idea} - ${e}`);
+                // 普通错误（如超时），任务保留在队列，锁释放后下一轮会重试
             }
+        } finally {
+            // 【关键】任务结束（无论成功失败），释放并发槽位
+            this.activeGenerations.delete(idea);
+            // 触发一次保存，确保队列变更持久化
+            void this.plugin.savePluginData();
+            this.updateStatusBar();
         }
     }
 
@@ -217,7 +282,6 @@ export class Engine {
             const { isApproved, reason } = await this.critic.judge(content);
             if (isApproved) {
                 await this.saveNote(task.idea, content);
-                // 批准后，清理缓存文件
                 await this.plugin.persistence.deleteTaskContent(task.idea);
                 
                 if (this.plugin.settings.extract_new_concepts) {
@@ -229,7 +293,6 @@ export class Engine {
             } else {
                 task.reason = reason;
                 task.retries = (task.retries || 0) + 1;
-                // 拒绝后，内容依然保存在缓存中，无需重新保存，只需移动队列
                 this.plugin.data.revisionQueue.push(task);
                 Logger.warn(`👎 [Rejected]: ${task.idea} - ${reason}`);
             }
@@ -256,8 +319,6 @@ export class Engine {
         for (const task of tasksToRevise) {
             if ((task.retries || 0) >= this.plugin.settings.max_revision_retries) {
                 this.plugin.data.discardedPile.push(task); 
-                // 达到最大重试次数，移入废弃堆。
-                // 暂时不删除缓存，允许用户在废弃堆手动 "永久删除" 或 "重新排队"。
                 Logger.error(`💀 [Give up]: ${task.idea} max retries reached.`);
                 continue; 
             }
@@ -284,7 +345,6 @@ export class Engine {
             const newContent = await this.apiHandler.call(prompt);
             const cleanedContent = cleanMarkdownOutput(newContent);
             
-            // 更新缓存文件
             await this.plugin.persistence.saveTaskContent(task.idea, cleanedContent);
 
             const revisedTask: TaskData = { ...task, content: cleanedContent };
@@ -294,8 +354,6 @@ export class Engine {
             const errMsg = e instanceof Error ? e.message : String(e);
             Logger.error(`❌ [Revision Failed]: ${task.idea} - ${errMsg}`);
             
-            // Revision 失败不建议立刻 Stop，可能是临时网络问题，放回 Revision 队列重试
-            // 但如果一直失败，会达到 retries 上限被丢弃
             this.plugin.data.revisionQueue.unshift(task); 
 
             if (e instanceof AllModelsFailedError) {
@@ -307,7 +365,6 @@ export class Engine {
 
     // --- File & UI ---
     
-    // 【新增】辅助方法：递归确保文件夹存在
     private async ensureFolderExists(folderPath: string): Promise<void> {
         const normalizedPath = normalizePath(folderPath);
         const folders = normalizedPath.split("/");
@@ -320,11 +377,9 @@ export class Engine {
                 try {
                     await this.app.vault.createFolder(currentPath);
                 } catch (error) {
-                    // 忽略并发创建时的错误
                     Logger.warn(`Folder check/create: ${currentPath}`, error);
                 }
             } else if (!(existing instanceof TFolder)) {
-                // 如果路径存在但不是文件夹（比如同名文件），这会是个问题
                 Logger.error(`Path conflict: ${currentPath} exists but is not a folder.`);
                 throw new Error(`Cannot create folder "${currentPath}" because a file exists with the same name.`);
             }
@@ -336,7 +391,6 @@ export class Engine {
         const folderPath = this.plugin.settings.output_dir;
 
         try {
-            // 【修复】使用递归创建方法
             await this.ensureFolderExists(folderPath);
         } catch (error) {
             Logger.error(`Create folder failed: ${folderPath}`, error);
