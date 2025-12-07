@@ -1,7 +1,6 @@
 // src/engine.ts
 
 import { Notice, TFile, TFolder, normalizePath, App } from "obsidian";
-// 【修正 1】使用默认导入，防止 named export 兼容性问题
 import Pinyin from 'tiny-pinyin'; 
 import KnowledgeGraphPlugin from "./main";
 import { APIHandler, AllModelsFailedError } from "./apiHandler";
@@ -20,6 +19,9 @@ export class Engine {
     private timerId: NodeJS.Timeout | null = null;
     
     private activeGenerations: Map<string, number> = new Map();
+    // 【修改点 1】新增：用于记录僵尸任务的重试次数，防止死循环
+    private zombieRetryCounts: Map<string, number> = new Map();
+    
     private readonly TASK_TIMEOUT_MS = 5 * 60 * 1000; 
 
     constructor(plugin: KnowledgeGraphPlugin) {
@@ -73,6 +75,7 @@ export class Engine {
         }
 
         if (addedCount > 0) {
+            // 【修改点 2】非阻塞保存，防止卡顿
             void this.plugin.savePluginData(); 
             this.updateStatusBar();
         }
@@ -88,7 +91,8 @@ export class Engine {
         
         this.tick().catch(error => {
             Logger.error("Tick error during start:", error);
-            this.stop();
+            // 即使启动时报错，也不要轻易停止，尝试继续调度
+            this.scheduleNextTick();
         });
     }
 
@@ -111,16 +115,37 @@ export class Engine {
         this.timerId = setTimeout(() => {
             this.tick().catch(error => {
                 Logger.error("Tick error:", error);
+                // 确保即使在回调中报错，也会尝试下一次心跳（虽然这里很难递归捕获，但尽力而为）
+                if(this.isRunning) this.scheduleNextTick();
             });
         }, delay);
     }
 
+    // 【修改点 3】重写僵尸任务清理逻辑
     private cleanupZombieTasks() {
         const now = Date.now();
         for (const [idea, startTime] of this.activeGenerations.entries()) {
             if (now - startTime > this.TASK_TIMEOUT_MS) {
-                Logger.warn(`🧹 [Zombie Sweeper]: Removing stuck task '${idea}' after ${this.TASK_TIMEOUT_MS / 1000}s.`);
+                // 1. 先移除活跃状态
                 this.activeGenerations.delete(idea);
+                
+                // 2. 获取已重试次数
+                const retries = this.zombieRetryCounts.get(idea) || 0;
+
+                // 3. 判断是否超过最大重试次数 (3次)
+                if (retries >= 3) {
+                    Logger.error(`💀 [Zombie Killer]: Task '${idea}' failed 3 times (timeout). Giving up.`);
+                    this.plugin.data.discardedPile.push({ idea, reason: "Timeout loops (Zombie)" });
+                    this.zombieRetryCounts.delete(idea);
+                } else {
+                    // 4. 未超过，放回队列头部重试
+                    Logger.warn(`🧹 [Zombie Sweeper]: Task '${idea}' timed out. Re-queuing (Attempt ${retries + 1}/3).`);
+                    
+                    if (!this.plugin.data.generationQueue.includes(idea)) {
+                        this.plugin.data.generationQueue.unshift(idea);
+                    }
+                    this.zombieRetryCounts.set(idea, retries + 1);
+                }
             }
         }
     }
@@ -158,12 +183,13 @@ export class Engine {
             }
 
         } catch (error) {
-            Logger.error("Engine fatal error:", error);
-            // 打印完整的错误堆栈，方便调试
+            // 【修改点 4】全局错误捕获不再停止引擎
+            Logger.error("Engine fatal error (recovered):", error);
             console.error(error); 
-            new Notice("Engine encountered an error and paused. Check console.");
-            this.stop(); 
-            return;
+            // new Notice("⚠️ Engine glitch detected. Retrying..."); 
+            // this.stop(); // <--- 移除此行，防止因未知错误关机
+            
+            // 依然保持运行状态，等待 scheduleNextTick 复活
         }
 
         this.scheduleNextTick();
@@ -186,7 +212,8 @@ export class Engine {
         batch.forEach(idea => this.activeGenerations.set(idea, Date.now()));
         
         this.updateStatusBar();
-        await this.plugin.savePluginData();
+        // 【修改点 5】移除 await，非阻塞保存
+        void this.plugin.savePluginData();
 
         batch.forEach(idea => {
             this.generationTask(idea).catch(err => {
@@ -212,17 +239,22 @@ export class Engine {
                 this.plugin.data.generationQueue.splice(qIndex, 1);
             }
 
+            // 成功后清除重试计数
+            this.zombieRetryCounts.delete(idea);
             Logger.log(`✅ [Generation Success]: ${idea}`);
         } catch (e) {
             if (e instanceof AllModelsFailedError) {
                 Logger.error(`❌ [Generation Failed]: ${idea} - ${e.message}`);
-                new Notice(`🛑 Engine paused: All models failed for '${idea}'. Check settings.`);
-                this.stop();
+                // 【修改点 6】移除 this.stop()，网络报错不关机
+                // new Notice(`🛑 Engine paused: All models failed for '${idea}'. Check settings.`);
+                // this.stop();
+                Logger.warn(`⚠️ Network/API error for '${idea}'. Will retry via zombie logic later.`);
             } else {
                 Logger.error(`⚠️ [Generation Error]: ${idea} - ${e}`);
             }
         } finally {
             this.activeGenerations.delete(idea);
+            // 【修改点 7】移除 await
             void this.plugin.savePluginData();
             this.updateStatusBar();
         }
@@ -236,7 +268,8 @@ export class Engine {
         const tasksToReview = queue.splice(0, Math.min(queue.length, batchSize));
 
         this.updateStatusBar();
-        await this.plugin.savePluginData(); 
+        // 【修改点 8】移除 await
+        void this.plugin.savePluginData(); 
 
         let newIdeasFound: Set<string> = new Set();
 
@@ -254,7 +287,6 @@ export class Engine {
 
             const { isApproved, reason } = await this.critic.judge(content);
             if (isApproved) {
-                // 【保存文件时可能会出错，所以这里是重点】
                 await this.saveNote(task.idea, content);
                 await this.plugin.persistence.deleteTaskContent(task.idea);
                 
@@ -276,7 +308,8 @@ export class Engine {
             this.addConceptsToQueue(Array.from(newIdeasFound));
         }
 
-        await this.plugin.savePluginData(); 
+        // 【修改点 9】移除 await
+        void this.plugin.savePluginData(); 
         return true;
     }
 
@@ -288,7 +321,8 @@ export class Engine {
         const tasksToRevise = queue.splice(0, Math.min(queue.length, batchSize));
 
         this.updateStatusBar();
-        await this.plugin.savePluginData(); 
+        // 【修改点 10】移除 await
+        void this.plugin.savePluginData(); 
 
         for (const task of tasksToRevise) {
             if ((task.retries || 0) >= this.plugin.settings.max_revision_retries) {
@@ -299,7 +333,8 @@ export class Engine {
             await this.revisionTask(task);
         }
 
-        await this.plugin.savePluginData(); 
+        // 【修改点 11】移除 await
+        void this.plugin.savePluginData(); 
         return true;
     }
 
@@ -331,8 +366,10 @@ export class Engine {
             this.plugin.data.revisionQueue.unshift(task); 
 
             if (e instanceof AllModelsFailedError) {
-                new Notice("🛑 Engine paused: All models failed during revision.");
-                this.stop();
+                // 【修改点 12】移除 this.stop()
+                // new Notice("🛑 Engine paused: All models failed during revision.");
+                // this.stop();
+                Logger.warn("⚠️ Revision failed due to API/Network error. Retrying later.");
             }
         }
     }
@@ -362,23 +399,19 @@ export class Engine {
         const filename = sanitizeFilename(idea);
         const baseDir = this.plugin.settings.output_dir;
         
-        // 【修正】使用 tiny-pinyin 的正确姿势
         let subFolder = "0-9_Others";
         const cleanName = filename.replace(/[\[\]]/g, '').trim();
         const firstChar = cleanName.charAt(0);
 
-        // 1. 英文
         if (/^[a-zA-Z]/.test(firstChar)) {
             subFolder = firstChar.toUpperCase();
         } 
-        // 2. 中文 (修正后的逻辑)
         else if (Pinyin.isSupported(firstChar)) {
             try {
-                // Pinyin.parse 返回数组，如 [{source: '中', type: 2, target: 'ZHONG'}]
                 const tokens = Pinyin.parse(firstChar);
                 if (tokens && tokens.length > 0 && tokens[0].target) {
-                    const pinyinStr = tokens[0].target; // 例如 "ZHONG"
-                    const pinyinLetter = pinyinStr.charAt(0).toUpperCase(); // 取 "Z"
+                    const pinyinStr = tokens[0].target; 
+                    const pinyinLetter = pinyinStr.charAt(0).toUpperCase(); 
                     
                     if (/^[A-Z]/.test(pinyinLetter)) {
                         subFolder = pinyinLetter;
@@ -386,7 +419,6 @@ export class Engine {
                 }
             } catch (err) {
                 Logger.warn(`Pinyin parse error for ${firstChar}:`, err);
-                // 出错则降级到 "CN_Chinese" 或 "Others"
                 subFolder = "CN_Chinese";
             }
         }
